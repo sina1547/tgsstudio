@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">یک استیکر تلگرام را باز کنید و تک‌تک لایه‌ها، مسیرها و کیفریم‌ها را ویرایش کنید.</string>
+    <string name="open_tgs">باز کردن فایل TGS</string>
+    <string name="opening">در حال باز کردن…</string>
+    <string name="open_another">باز کردن فایل دیگر</string>
+    <string name="error_title">این فایل باز نشد</string>
+    <string name="error_unreadable">فایل خوانده نشد. مطمئن شوید هنوز وجود دارد و دوباره امتحان کنید.</string>
+    <string name="error_invalid">این فایل یک TGS یا Lottie معتبر نیست.</string>
+    <string name="error_too_large">حجم این فایل برای باز شدن بیش از حد است.</string>
+    <string name="info_size">بوم</string>
+    <string name="info_duration">مدت</string>
+    <string name="info_file_size">حجم فایل</string>
+    <string name="info_contents">محتوا</string>
+    <string name="value_canvas">%1$d × %2$d پیکسل</string>
+    <string name="value_duration">%1$s ثانیه · %2$s فریم بر ثانیه · %3$s فریم</string>
+    <string name="value_file_size">%1$s کیلوبایت</string>
+    <string name="value_contents">%1$d لایه · %2$d المان شکل · %3$d کیفریم · %4$d پیش‌ترکیب</string>
+    <string name="layers_heading">لایه‌ها</string>
+    <string name="hidden">مخفی</string>
+    <string name="type_shape">شکل</string>
+    <string name="type_null">خالی</string>
+    <string name="type_precomp">پیش‌ترکیب</string>
+    <string name="type_text">متن</string>
+    <string name="type_solid">رنگ ساده</string>
+    <string name="type_image">تصویر</string>
+    <string name="type_other">نوع دیگر (%1$d)</string>
+    <string name="untitled">بدون نام</string>
+</resources>

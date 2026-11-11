@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">SINA TGS Studio</string>
+    <string name="tagline">Open a Telegram sticker and edit every layer, path and keyframe.</string>
+    <string name="open_tgs">Open TGS file</string>
+    <string name="opening">Opening…</string>
+    <string name="open_another">Open another file</string>
+    <string name="error_title">Couldn’t open this file</string>
+    <string name="error_unreadable">The file couldn’t be read. Check that it still exists and try again.</string>
+    <string name="error_invalid">This isn’t a valid TGS or Lottie file.</string>
+    <string name="error_too_large">This file is too large to open.</string>
+    <string name="info_size">Canvas</string>
+    <string name="info_duration">Duration</string>
+    <string name="info_file_size">File size</string>
+    <string name="info_contents">Contents</string>
+    <string name="value_canvas">%1$d × %2$d px</string>
+    <string name="value_duration">%1$s s · %2$s fps · %3$s frames</string>
+    <string name="value_file_size">%1$s KB</string>
+    <string name="value_contents">%1$d layers · %2$d shape items · %3$d keyframes · %4$d precomps</string>
+    <string name="layers_heading">Layers</string>
+    <string name="hidden">hidden</string>
+    <string name="type_shape">Shape</string>
+    <string name="type_null">Null</string>
+    <string name="type_precomp">Precomp</string>
+    <string name="type_text">Text</string>
+    <string name="type_solid">Solid</string>
+    <string name="type_image">Image</string>
+    <string name="type_other">Other (%1$d)</string>
+    <string name="untitled">Untitled</string>
+</resources>
