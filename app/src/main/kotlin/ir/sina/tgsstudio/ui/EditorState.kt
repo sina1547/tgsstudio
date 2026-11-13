@@ -85,10 +85,10 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     val dirty: Boolean get() = tick >= 0 && session.history.revision != savedRevision
     fun markSaved() { savedRevision = session.history.revision; changed() }
 
-    fun setPanel(p: PanelTab?) { panel = p; if (p != null) prefs.openPanel = p.name.lowercase(); prefs.panelOpen = p != null }
+    fun updatePanel(p: PanelTab?) { panel = p; if (p != null) prefs.openPanel = p.name.lowercase(); prefs.panelOpen = p != null }
     fun savePanelHeight() { prefs.panelHeightDp = panelHeightDp }
     fun setWorkspaceMode(w: Workspace) {
         workspace = w; prefs.workspace = w.name.lowercase()
-        when (w) { Workspace.DESIGN -> setPanel(PanelTab.LAYERS); Workspace.ANIMATION -> setPanel(PanelTab.TIMELINE); Workspace.ADVANCED -> setPanel(panel ?: PanelTab.LAYERS) }
+        when (w) { Workspace.DESIGN -> updatePanel(PanelTab.LAYERS); Workspace.ANIMATION -> updatePanel(PanelTab.TIMELINE); Workspace.ADVANCED -> updatePanel(panel ?: PanelTab.LAYERS) }
     }
 }

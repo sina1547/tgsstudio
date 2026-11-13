@@ -98,7 +98,7 @@ fun LayersPanel(state: EditorState) {
             Spacer(Modifier.width(6.dp))
             SmallButton(tr("Group", "گروه"), { handleResult(state, state.act { groupSelection() }) }, enabled = state.session.selection.count { it is ShapeTarget } >= 1)
             Spacer(Modifier.width(6.dp))
-            IconBtn(Ic.Plus, { state.setPanel(PanelTab.ADD) }, size = 38.dp, iconSize = 20.dp)
+            IconBtn(Ic.Plus, { state.updatePanel(PanelTab.ADD) }, size = 38.dp, iconSize = 20.dp)
         }
         if (rows.isEmpty()) Text(tr("No layers yet. Use Add to create a shape.", "هنوز لایه‌ای نیست. با «افزودن» یک شکل بسازید."), color = StudioColors.TextMuted, modifier = Modifier.padding(16.dp))
         LazyColumn(Modifier.fillMaxWidth()) {

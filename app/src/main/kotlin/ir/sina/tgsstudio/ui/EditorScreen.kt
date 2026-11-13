@@ -85,7 +85,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("no stream")
                 state.act { addSvg(text) }
             }.onSuccess { r ->
-                state.setPanel(PanelTab.PROPERTIES)
+                state.updatePanel(PanelTab.PROPERTIES)
                 state.message = when {
                     r == null || r.groups.isEmpty() -> if (lang == Lang.FA) "شکل برداری در این SVG پیدا نشد." else "No vector shapes found in this SVG."
                     r.skipped.isNotEmpty() -> (if (lang == Lang.FA) "وارد شد. پشتیبانی‌نشده: " else "Imported. Not supported: ") + r.skipped.joinToString()
@@ -118,7 +118,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         when {
             state.previewMode -> { state.previewMode = false; state.playing = false }
             state.penPath != null -> { state.penPath = null; state.changed() }
-            state.panel != null -> state.setPanel(null)
+            state.panel != null -> state.updatePanel(null)
             state.tool != Tool.SELECT -> { state.tool = Tool.SELECT; state.changed() }
             state.dirty -> showLeave = true
             else -> onExit()
@@ -266,7 +266,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Copy, { state.act { duplicateSelection() } }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Up, { sel.singleOrNull()?.let { t -> state.act { move(t, -1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Down, { sel.singleOrNull()?.let { t -> state.act { move(t, 1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
-                IconBtn(Ic.Props, { state.setPanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
+                IconBtn(Ic.Props, { state.updatePanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
@@ -310,7 +310,7 @@ private fun Dock(state: EditorState) {
         items.forEach { (tab, pair) ->
             val active = state.panel == tab
             Column(
-                Modifier.weight(1f).fillMaxSize().clickable { state.setPanel(if (state.panel == tab) null else tab) },
+                Modifier.weight(1f).fillMaxSize().clickable { state.updatePanel(if (state.panel == tab) null else tab) },
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
                 Icon(pair.first, if (active) StudioColors.Accent else StudioColors.TextMuted, 22.dp)

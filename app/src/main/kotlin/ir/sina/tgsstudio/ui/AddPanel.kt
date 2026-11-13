@@ -43,7 +43,7 @@ private fun AddTile(ic: Ic, label: String, onClick: () -> Unit, modifier: Modifi
 @Composable
 fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
     val w = state.session.doc.width / 2.0; val h = state.session.doc.height / 2.0
-    fun add(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) { state.act(block); state.tool = Tool.SELECT; state.setPanel(PanelTab.PROPERTIES) }
+    fun add(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) { state.act(block); state.tool = Tool.SELECT; state.updatePanel(PanelTab.PROPERTIES) }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Ic.Add, StudioColors.Accent, 20.dp)
@@ -57,7 +57,7 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
             AddTile(Ic.Polygon, tr("Polygon", "چندضلعی"), { add { addPolygon(w, h, 110.0) } }, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AddTile(Ic.Pen, tr("Pen path", "مسیر آزاد"), { state.tool = Tool.PEN; state.setPanel(null); state.changed() }, Modifier.weight(1f))
+            AddTile(Ic.Pen, tr("Pen path", "مسیر آزاد"), { state.tool = Tool.PEN; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
             AddTile(Ic.Text, tr("Text", "متن"), onText, Modifier.weight(1f))
             AddTile(Ic.Svg, "SVG", onPickSvg, Modifier.weight(1f))
             AddTile(Ic.NullLayer, tr("Null", "لایهٔ خالی"), {
@@ -98,7 +98,7 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
                 else {
                     val scale = minOf(380.0 / mask.width, 200.0 / mask.height).coerceAtMost(1.0)
                     state.act { addCenterlineText(lines, scale, color, text.take(24)) }
-                    state.setPanel(PanelTab.PROPERTIES); onDismiss()
+                    state.updatePanel(PanelTab.PROPERTIES); onDismiss()
                 }
             }) { Text(tr("Add", "افزودن"), color = StudioColors.Accent) }
         },
