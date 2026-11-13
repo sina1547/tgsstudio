@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "TGSStudio"
-include(":app", ":document", ":parser")
+include(":app", ":document", ":parser", ":renderer", ":editor", ":export")
