@@ -49,6 +49,13 @@ object Creator {
         "r" to staticProp(0.0), "or" to staticProp(radius), "os" to staticProp(0.0), "nm" to str("Polygon 1"),
     )
 
+    /** A star as a plain path (`sh`); the polystar item `sr` is on Telegram's list of unsupported shapes. */
+    fun starPath(points: Int, outer: Double, inner: Double): JsonObj =
+        pathItem(PathOps.fromContour(ir.sina.tgsstudio.renderer.Shapes.star(0.0, 0.0, points, outer, inner, 0.0))!!, "Star 1")
+
+    fun polygonPath(points: Int, radius: Double): JsonObj =
+        pathItem(PathOps.fromContour(ir.sina.tgsstudio.renderer.Shapes.star(0.0, 0.0, points, radius, null, 0.0))!!, "Polygon 1")
+
     fun pathItem(b: Bezier, name: String = "Path 1"): JsonObj = obj(
         "ty" to str("sh"), "ks" to staticPathProp(b), "nm" to str(name),
     )

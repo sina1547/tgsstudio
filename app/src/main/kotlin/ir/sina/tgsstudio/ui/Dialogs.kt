@@ -38,6 +38,10 @@ private fun DialogTitle(text: String) = Text(text, color = StudioColors.TextPrim
 @Composable
 fun issueText(i: Issue): String = when (i.code) {
     "canvas_size" -> tr("Canvas is ${i.detail}; Telegram needs 512×512.", "اندازهٔ بوم ${i.detail} است؛ تلگرام ۵۱۲×۵۱۲ می‌خواهد.")
+    "frame_rate_30" -> tr("Frame rate is 30 fps; Telegram's page asks for 60 fps.", "نرخ فریم ۳۰ است؛ صفحهٔ تلگرام ۶۰ فریم بر ثانیه می‌خواهد.")
+    "prohibited" -> tr("Not allowed by Telegram: ${i.detail}.", "تلگرام اجازه نمی‌دهد: ${i.detail}.")
+    "keyframe_no_easing" -> tr("A keyframe has no easing handles (${i.detail}); it would be ignored.", "یک کیفریم دستگیرهٔ easing ندارد (${i.detail})؛ نادیده گرفته می‌شود.")
+    "keyframe_last_easing" -> tr("The last keyframe must not have easing handles (${i.detail}).", "کیفریمِ آخر نباید دستگیرهٔ easing داشته باشد (${i.detail}).")
     "duration" -> tr("Duration is ${i.detail} s; the maximum is 3 s.", "مدت ${i.detail} ثانیه است؛ حداکثر ۳ ثانیه.")
     "frame_rate" -> tr("Frame rate is ${i.detail}; use 30 or 60 fps.", "نرخ فریم ${i.detail} است؛ ۳۰ یا ۶۰ فریم بر ثانیه استفاده کنید.")
     "file_size" -> tr("Compressed size is ${i.detail}; the limit is 64 KB.", "حجم فشرده ${i.detail} است؛ سقف ۶۴ کیلوبایت.")
@@ -61,6 +65,7 @@ enum class ExportKind(val mime: String, val ext: String) { TGS("application/octe
 @Composable
 fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss: () -> Unit) {
     val issues = remember { Validator.validate(doc) }
+    val repairs = remember { Exporter.repairReport(doc) }
     val size = remember { Exporter.tgsSize(doc) }
     val errors = issues.count { it.severity == Severity.ERROR }
     AlertDialog(
@@ -69,6 +74,10 @@ fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss:
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tr("TGS size: ${String.format(Locale.US, "%.1f", size / 1024.0)} KB of 64 KB", "حجم TGS: ${String.format(Locale.US, "%.1f", size / 1024.0)} از ۶۴ کیلوبایت"), color = if (size > Validator.MAX_BYTES) StudioColors.Danger else StudioColors.TextPrimary, fontSize = 14.sp)
+                if (repairs.any) Text(
+                    tr("Fixed automatically in the exported file: ${repairs.keyframeListsRepaired} keyframe list(s), ${repairs.starsConverted} star/polygon shape(s) turned into paths.", "در فایل خروجی خودکار اصلاح شد: ${repairs.keyframeListsRepaired} فهرست کیفریم، ${repairs.starsConverted} ستاره/چندضلعی به مسیر تبدیل شد."),
+                    color = StudioColors.TextMuted, fontSize = 12.sp,
+                )
                 if (issues.isEmpty()) Text(tr("✓ Meets Telegram's sticker limits.", "✓ با محدودیت‌های استیکر تلگرام سازگار است."), color = StudioColors.Green, fontSize = 14.sp)
                 else issues.forEach { i ->
                     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

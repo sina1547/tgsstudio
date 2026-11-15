@@ -201,6 +201,7 @@ private fun KeyframeBar(state: EditorState, entry: PropEntry, index: Int) {
     val mode = KeyframeOps.interpolation(entry.prop, index)
     val times = KeyframeOps.times(entry.prop)
     if (index !in times.indices) return
+    val canEase = KeyframeOps.hasOutgoingSegment(entry.prop, index)   // the last keyframe has no segment after it
     Column(Modifier.fillMaxWidth().background(StudioColors.PanelRaised).padding(horizontal = 10.dp, vertical = 6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${propLabel(entry.key)} · ${tr("frame", "فریم")} ${fmt(times[index], 0)}", color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
@@ -209,11 +210,11 @@ private fun KeyframeBar(state: EditorState, entry: PropEntry, index: Int) {
             IconBtn(Ic.Trash, { state.act { removeKeyframe(entry, index) }; state.selectedKey = null }, size = 36.dp, iconSize = 18.dp)
         }
         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallButton(tr("Linear", "خطی"), { state.act { setInterpolation(entry, index, Interp.LINEAR) } }, primary = mode == Interp.LINEAR)
-            SmallButton(tr("Hold", "ثابت"), { state.act { setInterpolation(entry, index, Interp.HOLD) } }, primary = mode == Interp.HOLD)
-            SmallButton(tr("Ease", "نرم"), { state.act { setInterpolation(entry, index, Interp.BEZIER) } }, primary = mode == Interp.BEZIER)
+            SmallButton(tr("Linear", "خطی"), { state.act { setInterpolation(entry, index, Interp.LINEAR) } }, primary = canEase && mode == Interp.LINEAR, enabled = canEase)
+            SmallButton(tr("Hold", "ثابت"), { state.act { setInterpolation(entry, index, Interp.HOLD) } }, primary = canEase && mode == Interp.HOLD, enabled = canEase)
+            SmallButton(tr("Ease", "نرم"), { state.act { setInterpolation(entry, index, Interp.BEZIER) } }, primary = canEase && mode == Interp.BEZIER, enabled = canEase)
         }
-        if (mode == Interp.BEZIER) {
+        if (canEase && mode == Interp.BEZIER) {
             val e = KeyframeOps.easing(entry.prop, index) ?: Easing.EASE_IN_OUT
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SmallButton(tr("In-Out", "ورود-خروج"), { state.act { setEasing(entry, index, Easing.EASE_IN_OUT) } })

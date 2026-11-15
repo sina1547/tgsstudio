@@ -101,7 +101,7 @@ object PropEval {
         if (o == null || i == null) return p
         val ox = comp(o, "x", dim, 0.0); val oy = comp(o, "y", dim, 0.0)
         val ix = comp(i, "x", dim, 1.0); val iy = comp(i, "y", dim, 1.0)
-        if (ox == oy && ix == iy && ox == 0.0 && ix == 1.0) return p
+        if (ox == oy && ix == iy) return p   // handles on the diagonal: a straight segment
         return cubicBezierY(p.coerceIn(0.0, 1.0), ox, oy, ix, iy)
     }
 

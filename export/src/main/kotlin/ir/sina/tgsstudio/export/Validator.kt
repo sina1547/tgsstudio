@@ -6,6 +6,8 @@ import ir.sina.tgsstudio.document.json.JsonArr
 import ir.sina.tgsstudio.document.json.JsonObj
 import ir.sina.tgsstudio.document.json.JsonStr
 import ir.sina.tgsstudio.document.json.JsonValue
+import ir.sina.tgsstudio.editor.PropWrite
+import ir.sina.tgsstudio.editor.TgsPrepare
 import ir.sina.tgsstudio.parser.TgsCodec
 import ir.sina.tgsstudio.renderer.SceneBuilder
 import kotlin.math.abs
@@ -23,7 +25,13 @@ object Validator {
     const val MAX_SECONDS = 3.0
     const val SIZE = 512
 
-    fun validate(doc: LottieDocument): List<Issue> {
+    /**
+     * Checks [source] against Telegram's published sticker rules plus the keyframe structure rlottie needs.
+     * With [asExported] (the default) the document is first repaired exactly as [Exporter] would, so the result
+     * describes the file that will actually be written; pass false to inspect a document as it is.
+     */
+    fun validate(source: LottieDocument, asExported: Boolean = true): List<Issue> {
+        val doc = if (asExported) TgsPrepare.repaired(source).first else source
         val out = ArrayList<Issue>()
         fun error(code: String, detail: String = "") { out += Issue(Severity.ERROR, code, detail) }
         fun warn(code: String, detail: String = "") { out += Issue(Severity.WARNING, code, detail) }
@@ -31,7 +39,9 @@ object Validator {
         // canvas, timing
         if (doc.width != SIZE || doc.height != SIZE) error("canvas_size", "${doc.width}×${doc.height}")
         if (doc.outPoint <= doc.inPoint) error("empty_range", "${doc.inPoint}–${doc.outPoint}")
-        if (doc.frameRate != 30.0 && doc.frameRate != 60.0) error("frame_rate", doc.frameRate.toString())
+        // Telegram's page says all animations must run at 60 fps; 30 is not listed, so it is a warning, anything else an error
+        if (doc.frameRate == 30.0) warn("frame_rate_30", "30")
+        else if (doc.frameRate != 60.0) error("frame_rate", doc.frameRate.toString())
         if (doc.frameRate > 0 && doc.durationSeconds > MAX_SECONDS + 1e-6) error("duration", "%.2f".format(java.util.Locale.ROOT, doc.durationSeconds))
 
         // structure
@@ -50,10 +60,11 @@ object Validator {
             }
         }
         checkKeyframes(doc.root, "", out)
+        PROHIBITED_SCAN(doc.root).forEach { error("prohibited", it) }
 
         // features Telegram does not support
         val scene = SceneBuilder(doc)
-        for (f in scene.build(doc.inPoint).unsupported) warn("unsupported", f)
+        for (f in scene.build(doc.inPoint).unsupported) if (f !in OFFICIAL_RENDERER_NAMES) warn("unsupported", f)
         scanFeatures(doc.root).forEach { warn("unsupported", it) }
 
         // everything should stay inside the canvas
@@ -84,21 +95,26 @@ object Validator {
         return hops >= 1000
     }
 
-    /** Keyframes must have a start value and ascending times. */
+    /** Keyframes need a start value, ascending times, and the easing-handle structure rlottie requires. */
     private fun checkKeyframes(v: JsonValue, path: String, out: MutableList<Issue>) {
         when (v) {
             is JsonObj -> {
                 val k = v["k"]
                 if (k is JsonArr && k.items.isNotEmpty() && k.items.all { it is JsonObj && it.has("t") }) {
-                    var last = -Double.MAX_VALUE
-                    for (kf in k.items) {
-                        kf as JsonObj
+                    val kfs = k.items.map { it as JsonObj }
+                    kfs.forEachIndexed { i, kf ->
                         val t = kf.double("t") ?: Double.NaN
-                        if (!t.isFinite()) out += Issue(Severity.ERROR, "bad_keyframe", path)
-                        else if (t < last) { out += Issue(Severity.ERROR, "keyframes_unsorted", path); break }
-                        else last = t
-                        if (kf["s"] == null && kf !== k.items.last()) out += Issue(Severity.ERROR, "bad_keyframe", path)
+                        if (!t.isFinite() || (kf["s"] == null && i != kfs.size - 1)) out += Issue(Severity.ERROR, "bad_keyframe", path)
                     }
+                    for (viol in PropWrite.violations(kfs)) out += Issue(
+                        Severity.ERROR,
+                        when (viol.kind) {
+                            PropWrite.Violation.Kind.NO_EASING -> "keyframe_no_easing"
+                            PropWrite.Violation.Kind.LAST_HAS_EASING -> "keyframe_last_easing"
+                            PropWrite.Violation.Kind.UNSORTED -> "keyframes_unsorted"
+                        },
+                        "$path #${viol.index}",
+                    )
                 } else v.fields.forEach { (key, child) -> checkKeyframes(child, "$path/$key", out) }
             }
             is JsonArr -> v.items.forEachIndexed { i, c -> checkKeyframes(c, "$path[$i]", out) }
@@ -106,8 +122,17 @@ object Validator {
         }
     }
 
-    /** Features the renderer might skip silently that Telegram's player does not support. */
-    private fun scanFeatures(root: JsonObj): Set<String> {
+    /** Names of renderer notices that [PROHIBITED_SCAN] already reports as errors. */
+    private val OFFICIAL_RENDERER_NAMES = setOf("text layers", "image layers", "repeater", "merge paths", "layer effects", "auto-orient", "time remap")
+
+    /**
+     * The features Telegram's sticker page says must not be used (After Effects names in brackets):
+     * masks, layer effects, expressions, images, solids, texts, 3D layers, merge paths, star shapes,
+     * gradient strokes, repeaters, time stretching, time remapping, auto-oriented layers.
+     * "Auto-bezier keys" cannot be told apart in the JSON and is not checked.
+     */
+    @Suppress("FunctionName")
+    private fun PROHIBITED_SCAN(root: JsonObj): Set<String> {
         val found = linkedSetOf<String>()
         fun walk(v: JsonValue) {
             when (v) {
@@ -115,14 +140,31 @@ object Validator {
                     if (v["x"] is JsonStr && v.has("k")) found += "expressions"
                     if (v.arr("ef")?.items?.isNotEmpty() == true) found += "layer effects"
                     if (v.arr("masksProperties")?.items?.isNotEmpty() == true) found += "masks"
-                    if (v.string("ty") == "mm") found += "merge paths"
-                    if (v.string("ty") == "rp") found += "repeater"
-                    if (v.has("tt")) found += "track mattes"
-                    if (v.has("tm") && v.int("ty") == 0) found += "time remap"
-                    if (v.int("ty") == 2 && v.has("refId")) found += "images"
-                    if (v.int("ty") == 5) found += "text layers"
+                    when (v.string("ty")) { "mm" -> found += "merge paths"; "rp" -> found += "repeaters"; "sr" -> found += "star shapes"; "gs" -> found += "gradient strokes" }
+                    if (v.int("ty") != null) { // a layer: layers have a numeric type, shape items a string one
+                        when (v.int("ty")) { 1 -> found += "solids"; 2 -> found += "images"; 5 -> found += "texts" }
+                        if (v.int("ddd") == 1) found += "3D layers"
+                        if (v.bool("ao") == true) found += "auto-oriented layers"
+                        v.double("sr")?.let { if (it != 1.0) found += "time stretching" }
+                        if (v.has("tm") && v.int("ty") == 0) found += "time remapping"
+                    }
                     v.fields.values.forEach(::walk)
                 }
+                is JsonArr -> v.items.forEach(::walk)
+                else -> Unit
+            }
+        }
+        walk(root)
+        if (root.int("ddd") == 1) found += "3D layers"
+        return found
+    }
+
+    /** Features the renderer might skip silently that Telegram's player does not support. */
+    private fun scanFeatures(root: JsonObj): Set<String> {
+        val found = linkedSetOf<String>()
+        fun walk(v: JsonValue) {
+            when (v) {
+                is JsonObj -> { if (v.has("tt")) found += "track mattes"; v.fields.values.forEach(::walk) }
                 is JsonArr -> v.items.forEach(::walk)
                 else -> Unit
             }

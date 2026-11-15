@@ -38,15 +38,15 @@ class ExportTest {
         assertTrue(Exporter.tgsSize(d) > Validator.MAX_BYTES)
     }
 
-    @Test fun structuralProblemsAndUnsupportedFeatures() {
+    @Test fun structuralProblemsAndProhibitedFeatures() {
         val d = LottieDocument(JsonParser.parse("""{"fr":60,"ip":0,"op":60,"w":512,"h":512,"layers":[
             {"ind":1,"ty":3,"nm":"a","parent":2,"ks":{"o":{"a":0,"k":100},"p":{"a":1,"k":[{"t":10,"s":[0,0]},{"t":5,"s":[1,1]}]}},"ip":0,"op":60},
             {"ind":2,"ty":3,"nm":"b","parent":1,"ks":{},"ip":0,"op":60},
             {"ind":2,"ty":5,"nm":"t","ks":{"o":{"a":0,"k":50,"x":"wiggle(1,2)"}},"ip":0,"op":60}]}""") as JsonObj)
-        val c = codes(d)
-        for (code in listOf("parent_cycle", "duplicate_layer_index", "keyframes_unsorted", "unsupported")) assertTrue(code in c, "$code in $c")
-        val feats = Validator.validate(d).filter { it.code == "unsupported" }.map { it.detail }
-        assertTrue("expressions" in feats && "text layers" in feats, feats.toString())
+        val c = Validator.validate(d, asExported = false).map { it.code }
+        for (code in listOf("parent_cycle", "duplicate_layer_index", "keyframes_unsorted", "prohibited")) assertTrue(code in c, "$code in $c")
+        val feats = Validator.validate(d, asExported = false).filter { it.code == "prohibited" }.map { it.detail }
+        assertTrue("expressions" in feats && "texts" in feats, feats.toString())
     }
 
     @Test fun warnsWhenContentLeavesTheCanvas() {

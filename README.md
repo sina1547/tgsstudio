@@ -18,3 +18,12 @@ doesn't understand is written back untouched. Undo/redo restores whole-document 
 ## Build
 Push to GitHub: the workflow runs every module's unit tests and builds the debug APK (artifact + Release).
 Locally: `gradle :document:test :parser:test :renderer:test :editor:test :export:test :app:assembleDebug` (Gradle 8.9, JDK 17).
+
+## Telegram TGS compatibility
+- Keyframes: every keyframe except the last must carry easing handles (`i`/`o`) or be a hold (`h:1`); the last must carry none.
+  rlottie drops violating keyframes (and crashed on path keyframes without them in our tests). `PropWrite.normalize` enforces this on
+  every edit, and the exporter repairs a copy of the document (`TgsPrepare`) before writing.
+- Star/polygon tools create plain `sh` paths (Telegram lists star shapes as unsupported).
+- `Validator` checks Telegram's published rules (512x512, <=3 s, 60 fps, <=64 KB, prohibited features) and the keyframe structure.
+- `tools/rlottie_check.py` renders the fixtures written by `RlottieFixtureTest` with rlottie and compares them with our renderer.
+  This is strong evidence, not a guarantee that Telegram's own apps and servers accept a file.

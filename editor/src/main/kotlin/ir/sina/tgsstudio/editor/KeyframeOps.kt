@@ -13,10 +13,14 @@ enum class Interp { LINEAR, HOLD, BEZIER }
 /** Cubic-bezier easing of the segment that starts at a keyframe: out handle (ox,oy), in handle (ix,iy). */
 data class Easing(val ox: Double, val oy: Double, val ix: Double, val iy: Double) {
     companion object {
+        /** Diagonal handles: a straight segment, written explicitly because rlottie needs handles on every non-last keyframe. */
+        val LINEAR = Easing(0.167, 0.167, 0.833, 0.833)
         val EASE_IN_OUT = Easing(0.333, 0.0, 0.667, 1.0)
         val EASE_IN = Easing(0.42, 0.0, 1.0, 1.0)
         val EASE_OUT = Easing(0.0, 0.0, 0.58, 1.0)
     }
+    /** True when both handles lie on the diagonal, which makes the segment mathematically linear. */
+    val isLinear: Boolean get() = ox == oy && ix == iy
 }
 
 object KeyframeOps {
@@ -82,12 +86,13 @@ object KeyframeOps {
 
     fun interpolation(prop: JsonObj, index: Int): Interp {
         val kf = list(prop).getOrNull(index) ?: return Interp.LINEAR
-        return when {
-            kf.bool("h") == true -> Interp.HOLD
-            kf.has("i") && kf.has("o") && easing(prop, index) != Easing(0.0, 0.0, 1.0, 1.0) -> Interp.BEZIER
-            else -> Interp.LINEAR
-        }
+        if (kf.bool("h") == true) return Interp.HOLD
+        val e = easing(prop, index) ?: return Interp.LINEAR
+        return if (e.isLinear) Interp.LINEAR else Interp.BEZIER
     }
+
+    /** The last keyframe has no outgoing segment, so interpolation and easing do not apply to it. */
+    fun hasOutgoingSegment(prop: JsonObj, index: Int): Boolean = index in 0 until list(prop).size - 1
 
     fun easing(prop: JsonObj, index: Int): Easing? {
         val kf = list(prop).getOrNull(index) ?: return null
@@ -96,21 +101,31 @@ object KeyframeOps {
         return Easing(first(o["x"]) ?: return null, first(o["y"]) ?: return null, first(i["x"]) ?: return null, first(i["y"]) ?: return null)
     }
 
+    /**
+     * Linear is stored as explicit diagonal handles (not by removing them) and Hold as `h:1`, so every non-last
+     * keyframe keeps a structure rlottie accepts. Ignored for the last keyframe.
+     */
     fun setInterpolation(prop: JsonObj, index: Int, interp: Interp) {
-        val kf = list(prop).getOrNull(index) ?: return
+        val kfs = PropWrite.keyframesOf(prop) ?: return
+        val kf = kfs.getOrNull(index) ?: return
+        if (!hasOutgoingSegment(prop, index)) return
         when (interp) {
-            Interp.LINEAR -> { kf.remove("h"); kf.remove("i"); kf.remove("o") }
+            Interp.LINEAR -> setEasing(prop, index, Easing.LINEAR)
             Interp.HOLD -> { kf.putInt("h", 1); kf.remove("i"); kf.remove("o") }
-            Interp.BEZIER -> { kf.remove("h"); setEasing(prop, index, easing(prop, index)?.takeIf { it != Easing(0.0, 0.0, 1.0, 1.0) } ?: Easing.EASE_IN_OUT) }
+            Interp.BEZIER -> setEasing(prop, index, easing(prop, index)?.takeIf { !it.isLinear } ?: Easing.EASE_IN_OUT)
         }
+        PropWrite.normalize(kfs)
     }
 
     fun setEasing(prop: JsonObj, index: Int, e: Easing) {
-        val kf = list(prop).getOrNull(index) ?: return
+        val kfs = PropWrite.keyframesOf(prop) ?: return
+        val kf = kfs.getOrNull(index) ?: return
+        if (!hasOutgoingSegment(prop, index)) return
         fun clamp01(v: Double) = v.coerceIn(0.0, 1.0)
         kf.remove("h")
         kf["o"] = obj("x" to jarr(doubleArrayOf(clamp01(e.ox))), "y" to jarr(doubleArrayOf(e.oy.coerceIn(-1.0, 2.0))))
         kf["i"] = obj("x" to jarr(doubleArrayOf(clamp01(e.ix))), "y" to jarr(doubleArrayOf(e.iy.coerceIn(-1.0, 2.0))))
+        PropWrite.normalize(kfs)
     }
 
     fun copy(prop: JsonObj, index: Int): JsonObj? = list(prop).getOrNull(index)?.deepCopy() as? JsonObj

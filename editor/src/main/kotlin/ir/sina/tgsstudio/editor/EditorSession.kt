@@ -194,9 +194,9 @@ class EditorSession(val doc: LottieDocument) {
     fun addEllipse(cx: Double, cy: Double, w: Double, h: Double, color: Rgba = Creator.DEFAULT_FILL) =
         addLayer("Ellipse", cx, cy, color, Creator.group("Ellipse", Creator.ellipseItem(w, h), Creator.fill(color)))
     fun addStar(cx: Double, cy: Double, radius: Double, points: Int = 5, color: Rgba = Creator.DEFAULT_FILL) =
-        addLayer("Star", cx, cy, color, Creator.group("Star", Creator.starItem(points, radius, radius * 0.45), Creator.fill(color)))
+        addLayer("Star", cx, cy, color, Creator.group("Star", Creator.starPath(points, radius, radius * 0.45), Creator.fill(color)))
     fun addPolygon(cx: Double, cy: Double, radius: Double, points: Int = 6, color: Rgba = Creator.DEFAULT_FILL) =
-        addLayer("Polygon", cx, cy, color, Creator.group("Polygon", Creator.polygonItem(points, radius), Creator.fill(color)))
+        addLayer("Polygon", cx, cy, color, Creator.group("Polygon", Creator.polygonPath(points, radius), Creator.fill(color)))
 
     /** A freeform path drawn in document coordinates (e.g. by the pen tool). */
     fun addFreeform(b: Bezier, color: Rgba = Creator.DEFAULT_FILL, filled: Boolean = b.closed, strokeWidth: Double = 6.0): LayerTarget? {

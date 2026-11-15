@@ -72,15 +72,71 @@ object PropWrite {
         return kf
     }
 
-    /** Old-format files carry an `e` end value; keep it consistent with the next keyframe's start. */
+    /**
+     * Enforces the keyframe structure rlottie (and so Telegram's players) require, found by testing:
+     * every keyframe except the last must carry easing handles `i` and `o` (or be a hold keyframe, `h:1`),
+     * and the last keyframe must not carry any. Keyframes without them are silently dropped by rlottie,
+     * which leaves the property at 0 (objects jump to the origin, opacity becomes 0).
+     * Also sorts by time and keeps old-format `e` end values consistent.
+     */
     fun normalize(kfs: MutableList<JsonObj>) {
         kfs.sortBy { it.double("t") ?: 0.0 }
         for (i in kfs.indices) {
             val kf = kfs[i]
-            if (i == kfs.size - 1) { kf.remove("e"); continue }
+            if (i == kfs.size - 1) { kf.remove("e"); kf.remove("i"); kf.remove("o"); kf.remove("h"); continue }
+            if (kf.bool("h") == true) { kf.remove("i"); kf.remove("o") } // hold: no handles needed
+            else {
+                if (!validEasing(kf["i"])) kf["i"] = LINEAR_IN.deepCopy()
+                if (!validEasing(kf["o"])) kf["o"] = LINEAR_OUT.deepCopy()
+                kf.remove("h")
+            }
             if (kf.has("e")) kf["e"] = kfs[i + 1]["s"]!!.deepCopy()
         }
     }
+
+    /** What [normalize] would fix, for validation. Index is the keyframe number inside its list. */
+    class Violation(val index: Int, val kind: Kind) { enum class Kind { NO_EASING, LAST_HAS_EASING, UNSORTED } }
+
+    fun violations(kfs: List<JsonObj>): List<Violation> {
+        val out = ArrayList<Violation>()
+        for (i in kfs.indices) {
+            val kf = kfs[i]
+            if (i > 0 && (kf.double("t") ?: 0.0) < (kfs[i - 1].double("t") ?: 0.0)) out += Violation(i, Violation.Kind.UNSORTED)
+            if (i == kfs.size - 1) { if (kf.has("i") || kf.has("o")) out += Violation(i, Violation.Kind.LAST_HAS_EASING) }
+            else if (kf.bool("h") != true && !(validEasing(kf["i"]) && validEasing(kf["o"]))) out += Violation(i, Violation.Kind.NO_EASING)
+        }
+        return out
+    }
+
+    /** Repairs every keyframe list in a document tree in place. Returns how many lists needed repair. */
+    fun normalizeTree(v: JsonValue): Int {
+        var repaired = 0
+        when (v) {
+            is JsonObj -> {
+                val kfs = keyframesOf(v)
+                if (kfs != null) { if (violations(kfs).isNotEmpty()) { normalize(kfs); repaired++ } }
+                v.fields.values.forEach { repaired += normalizeTree(it) }
+            }
+            is JsonArr -> v.items.forEach { repaired += normalizeTree(it) }
+            else -> Unit
+        }
+        return repaired
+    }
+
+    /** `{x: n | [n], y: n | [n]}` with finite numbers. */
+    private fun validEasing(v: JsonValue?): Boolean {
+        val o = v as? JsonObj ?: return false
+        fun ok(c: JsonValue?) = when (c) {
+            is JsonNum -> c.value.toDouble().isFinite()
+            is JsonArr -> c.items.isNotEmpty() && c.items.all { it is JsonNum && it.value.toDouble().isFinite() }
+            else -> false
+        }
+        return ok(o["x"]) && ok(o["y"])
+    }
+
+    /** Easing handles on the diagonal: mathematically a straight (linear) segment, and what After Effects writes for "Linear". */
+    val LINEAR_OUT: JsonObj get() = obj("x" to jarr(doubleArrayOf(0.167)), "y" to jarr(doubleArrayOf(0.167)))
+    val LINEAR_IN: JsonObj get() = obj("x" to jarr(doubleArrayOf(0.833)), "y" to jarr(doubleArrayOf(0.833)))
 
     private fun oldNumbers(v: JsonValue?): DoubleArray = when (v) {
         is JsonNum -> doubleArrayOf(v.value.toDouble())
