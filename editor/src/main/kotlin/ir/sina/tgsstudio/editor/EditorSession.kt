@@ -16,6 +16,9 @@ import ir.sina.tgsstudio.renderer.SceneBuilder
  * dependency, so everything the editor does can be tested on the JVM. Every public mutator is one undo step
  * (or part of an open gesture).
  */
+/** Timing of a write-on (Trim Paths) animation, in document frames. */
+data class WriteOn(val startFrame: Double, val frames: Double, val easing: Easing = Easing.EASE_IN_OUT)
+
 class EditorSession(val doc: LottieDocument) {
     val history = History(doc.root)
     val index: DocIndex get() = DocIndex(doc)
@@ -131,7 +134,7 @@ class EditorSession(val doc: LottieDocument) {
         edit("Delete") {
             targets.filterIsInstance<ShapeTarget>().sortedWith(compareBy({ it.ref.layer.scope ?: "" }, { it.ref.layer.index }, { it.ref.path.size }, { it.ref.path.lastOrNull() ?: 0 })).asReversed()
                 .forEach { ShapeOps.delete(index, it.ref) }
-            targets.filterIsInstance<LayerTarget>().sortedWith(compareBy({ it.layer.scope ?: "" }, { it.layer.index })).asReversed().forEach { LayerOps.delete(index, it.layer) }
+            targets.filterIsInstance<LayerTarget>().sortedWith(compareBy({ it.layer.scope ?: "" }, { it.layer.index })).asReversed().forEach { ParentOps.releaseChildren(index, it.layer, frame); LayerOps.delete(index, it.layer) }
         }
         select(emptyList()); return true
     }
@@ -177,6 +180,28 @@ class EditorSession(val doc: LottieDocument) {
 
     fun moveShapeOut(t: ShapeTarget): OpResult { val r = edit("Move out of group") { ShapeOps.moveOut(index, t.ref) }; if (r is OpResult.Ok) select(emptyList()); return r }
 
+    // ---- parent / child ----------------------------------------------------------------------------
+
+    fun parentOf(ref: LayerRef): LayerRef? = ParentOps.parentOf(index, ref)
+    fun childrenOf(ref: LayerRef): List<LayerRef> = ParentOps.childrenOf(index, ref)
+    fun parentCandidates(children: List<LayerRef>): List<LayerRef> = ParentOps.candidates(index, children)
+
+    /** Links [children] to [parent] (null = detach). They keep their on-screen position when possible. A refusal changes nothing. */
+    fun setParent(children: List<LayerRef>, parent: LayerRef?, keepPosition: Boolean = true): ParentResult {
+        ParentOps.validate(index, children, parent)?.let { return ParentResult(0, 0, emptyList(), it) }
+        var result = ParentResult(0, 0, emptyList())
+        edit(if (parent == null) "Detach" else "Parent") { result = ParentOps.setParent(index, children, parent, frame, keepPosition) }
+        return result
+    }
+
+    fun createNullParent(children: List<LayerRef>): LayerRef? {
+        var created: LayerRef? = null
+        var shifted: List<LayerRef> = children
+        edit("Create parent") { ParentOps.createNullParent(index, children, frame)?.let { (n, kids, _) -> created = n; shifted = kids } }
+        select(shifted.map { LayerTarget(it) })
+        return created
+    }
+
     // ---- creating elements -------------------------------------------------------------------------
 
     private fun addLayer(name: String, cx: Double, cy: Double, color: Rgba?, vararg groups: ir.sina.tgsstudio.document.json.JsonObj): LayerTarget? {
@@ -208,6 +233,42 @@ class EditorSession(val doc: LottieDocument) {
         val items = mutableListOf(Creator.pathItem(local))
         if (filled) items += Creator.fill(color) else items += Creator.stroke(color, strokeWidth)
         return addLayer("Path", cx, cy, color, Creator.group("Path", *items.toTypedArray()))
+    }
+
+    /** Layer name used for strokes made with the pen, so the eraser only removes drawn strokes. */
+    private val penName = "Pen stroke"
+
+    /**
+     * A freehand stroke through [points] (document coordinates) as an editable path layer: round caps, [widthPx],
+     * [opacityPct]. With [writeOn] the path also gets Trim Paths so it is drawn gradually from start to end.
+     */
+    fun addStroke(points: List<Pair<Double, Double>>, color: Rgba, widthPx: Double, opacityPct: Double = 100.0, writeOn: WriteOn? = null): LayerTarget? {
+        val own = !history.isGestureOpen                       // one stroke, one undo step (including its write-on animation)
+        if (own) history.begin("Draw")
+        try { return addStrokeSteps(points, color, widthPx, opacityPct, writeOn) } finally { if (own) { history.commit(); touch() } }
+    }
+
+    private fun addStrokeSteps(points: List<Pair<Double, Double>>, color: Rgba, widthPx: Double, opacityPct: Double, writeOn: WriteOn?): LayerTarget? {
+        val b = Freehand.fit(points) ?: return null
+        var minX = Double.MAX_VALUE; var minY = Double.MAX_VALUE; var maxX = -Double.MAX_VALUE; var maxY = -Double.MAX_VALUE
+        for (i in 0 until b.count) { minX = minOf(minX, b.v[2 * i]); maxX = maxOf(maxX, b.v[2 * i]); minY = minOf(minY, b.v[2 * i + 1]); maxY = maxOf(maxY, b.v[2 * i + 1]) }
+        val cx = (minX + maxX) / 2; val cy = (minY + maxY) / 2
+        val stroke = Creator.stroke(color, widthPx.coerceIn(0.5, 200.0)).also { StyleOps.setOpacity(it, 0.0, opacityPct) }
+        val group = Creator.group(penName, Creator.pathItem(PathOps.translateAll(b, -cx, -cy), "Stroke"), stroke)
+        val layer = addLayer(penName, cx, cy, color, group) ?: return null
+        if (writeOn != null) animateTrim(layer, TrimAnim.DRAW_ON, writeOn.startFrame, writeOn.frames, writeOn.easing)
+        return layer
+    }
+
+    /** Eraser: removes the topmost pen stroke under (x, y). Call inside [beginGesture]/[endGesture] while dragging. */
+    fun eraseStrokeAt(x: Double, y: Double, toleranceDoc: Double): Boolean {
+        val hit = Hit.at(scene(), x, y, toleranceDoc) ?: return false
+        val layer = index.layer(hit.layer) ?: return false
+        if (!layer.name.startsWith(penName)) return false
+        ParentOps.releaseChildren(index, hit.layer, frame)
+        LayerOps.delete(index, hit.layer)
+        selection = emptyList(); touch()
+        return true
     }
 
     fun addSvg(svg: String): SvgImportResult? {
@@ -270,6 +331,54 @@ class EditorSession(val doc: LottieDocument) {
     fun structuralPathEdit(ref: ShapeRef, label: String, f: (Bezier) -> Bezier?): Boolean {
         var ok = false
         edit(label) { ok = index.shapeRaw(ref)?.let { PathEdit.structural(it, Spaces.localFrame(index, ref.layer.scope, frame), f) } ?: false }
+        return ok
+    }
+
+    // ---- effects -----------------------------------------------------------------------------------
+
+    /** Applies [kind] to every selected layer (shape targets use their layer). The selection follows the layers, whose refs may shift. */
+    fun applyEffect(kind: EffectKind, params: EffectParams): EffectResult {
+        val layers = selection.map { LayerTarget(it.layer) }.distinct()
+        var result = EffectResult(layers, emptySet(), 0)
+        edit("Effect: ${kind.title}") { result = EffectEngine.apply(this, layers, kind, params) }
+        if (result.applied > 0) select(result.targets)
+        return result
+    }
+
+    fun effectNullsOf(layer: LayerRef): List<LayerRef> = EffectEngine.effectNullsOf(index, layer)
+
+    fun removeEffectNull(nullRef: LayerRef): Boolean {
+        var ok = false
+        edit("Remove effect") { ok = EffectEngine.removeEffectNull(this, nullRef) }
+        select(emptyList())
+        return ok
+    }
+
+    // ---- trim paths --------------------------------------------------------------------------------
+
+    private fun trimGroups(t: Target): List<ir.sina.tgsstudio.document.json.JsonObj> = when (t) {
+        is LayerTarget -> index.layerRaw(t.layer)?.let { TrimOps.groupsOfLayer(it) }.orEmpty()
+        is ShapeTarget -> {
+            val raw = index.shapeRaw(t.ref)
+            val group = if (raw?.string("ty") == "gr") raw else t.ref.parent?.let { index.shapeRaw(it) }
+            listOfNotNull(group)
+        }
+    }
+
+    fun canTrim(t: Target): Boolean = trimGroups(t).isNotEmpty()
+    fun hasTrim(t: Target): Boolean = trimGroups(t).any { TrimOps.find(it) != null }
+    fun trimItem(t: Target): ir.sina.tgsstudio.document.json.JsonObj? = trimGroups(t).firstNotNullOfOrNull { TrimOps.find(it) }
+
+    fun addTrim(t: Target): Boolean { var ok = false; edit("Add trim paths") { ok = trimGroups(t).count { TrimOps.ensure(it) != null } > 0 }; return ok }
+    fun removeTrim(t: Target) = edit("Remove trim paths") { trimGroups(t).forEach { TrimOps.remove(it) } }
+
+    /** Adds trim paths where missing and plays [mode] over [frames] frames starting at [startFrame] (document frames). */
+    fun animateTrim(t: Target, mode: TrimAnim, startFrame: Double = frame, frames: Double, easing: Easing = Easing.EASE_IN_OUT): Boolean {
+        var ok = false
+        edit("Trim animation") {
+            val lf = Spaces.localFrame(index, t.layer.scope, startFrame)
+            for (g in trimGroups(t)) { val trim = TrimOps.ensure(g) ?: continue; TrimOps.animate(trim, mode, lf, frames, easing); ok = true }
+        }
         return ok
     }
 

@@ -32,6 +32,7 @@ import ir.sina.tgsstudio.editor.ShapeTarget
 import ir.sina.tgsstudio.editor.Spaces
 import ir.sina.tgsstudio.editor.Target
 import ir.sina.tgsstudio.editor.TransformOps
+import ir.sina.tgsstudio.editor.TrimAnim
 import ir.sina.tgsstudio.renderer.PropEval
 import ir.sina.tgsstudio.renderer.Rgba
 
@@ -63,8 +64,10 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { TransformSection(state, target) }
         key(tick) { AppearanceSection(state, target) }
         key(tick) { ShapeSection(state, target) }
+        key(tick) { TrimSection(state, target) }
         key(tick) { PathSection(state, target) }
         key(tick) { AnimationSection(state, target) }
+        key(tick) { EffectsSection(state, target) }
         key(tick) { AdvancedSection(state, target) }
     }
 }
@@ -172,7 +175,7 @@ private fun ShapeSection(state: EditorState, t: Target) {
         }
     }
 }
-private val SHAPE_KEYS = setOf("size", "roundness", "points", "outer", "inner", "start", "end", "offset", "r")
+private val SHAPE_KEYS = setOf("size", "roundness", "points", "outer", "inner", "r")
 
 @Composable
 private fun PathSection(state: EditorState, t: Target) {
@@ -236,5 +239,62 @@ private fun AdvancedSection(state: EditorState, t: Target) {
             val hidden = (t as? LayerTarget)?.let { state.session.index.layer(it.layer)?.hidden } ?: (t as? ShapeTarget)?.let { state.session.index.shape(it.ref)?.hidden } ?: false
             Switch(hidden, { state.act { setHidden(t, it) } }, colors = SwitchDefaults.colors(checkedTrackColor = StudioColors.Accent))
         }
+    }
+}
+
+@Composable
+private fun TrimSection(state: EditorState, t: Target) {
+    val session = state.session
+    if (!session.canTrim(t)) return
+    var duration by rememberSaveable { mutableStateOf(45.0) }
+    val has = session.hasTrim(t)
+    Section(tr("Trim Paths", "برش مسیر"), defaultOpen = has) {
+        if (!has) {
+            Text(tr("Draws or erases a path gradually. Start, End and Offset can all be keyframed.", "مسیر را به‌تدریج می‌کشد یا پاک می‌کند. شروع، پایان و جابه‌جایی هر سه کیفریم‌پذیرند."), color = StudioColors.TextMuted, fontSize = 13.sp)
+            SmallButton(tr("Add Trim Paths", "افزودن برش مسیر"), { state.act { addTrim(t) } }, primary = true, modifier = Modifier.padding(top = 8.dp), ic = Ic.Path)
+            return@Section
+        }
+        val lf = Spaces.localFrame(session.index, t.layer.scope, state.frame)
+        for (e in session.animatedProps(t).filter { it.key == "start" || it.key == "end" || it.key == "offset" }) {
+            val v = session.valueAt(e)?.firstOrNull() ?: 0.0
+            val here = KeyframeOps.times(e.prop).indexOfFirst { kotlin.math.abs(it - lf) < 0.5 }
+            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(propLabel(e.key), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.weight(0.9f))
+                NumberField(v, { nv -> state.act { edit("Trim") { PropWrite.setValues(e.prop, lf, doubleArrayOf(nv)) } } }, Modifier.weight(1f), suffix = if (e.key == "offset") "°" else "%")
+                IconBtn(Ic.Key, { state.act { if (here >= 0) removeKeyframe(e, here) else addKeyframe(e, t.layer.scope) } }, size = 38.dp, iconSize = 18.dp, active = here >= 0)
+            }
+        }
+        Labeled(tr("Duration", "مدت")) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(duration, { duration = it.coerceAtLeast(2.0) }, Modifier.weight(1f), decimals = 0, suffix = tr("frames", "فریم"))
+                Text("= ${fmt(duration / session.doc.frameRate, 2)} ${tr("s", "ثانیه")}", color = StudioColors.TextMuted, fontSize = 12.sp)
+            }
+        }
+        Text(tr("Plays from the playhead (frame ${state.frame.toInt()}):", "از جای پخش‌کننده (فریم ${state.frame.toInt()}) اجرا می‌شود:"), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallButton(tr("Draw on", "کشیده شدن"), { state.act { animateTrim(t, TrimAnim.DRAW_ON, state.frame, duration) }; state.seek(state.frame); state.playing = true }, primary = true)
+            SmallButton(tr("Draw off", "جمع شدن"), { state.act { animateTrim(t, TrimAnim.DRAW_OFF, state.frame, duration) }; state.seek(state.frame); state.playing = true })
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallButton(tr("Erase from start", "پاک شدن از ابتدا"), { state.act { animateTrim(t, TrimAnim.ERASE_FROM_START, state.frame, duration) }; state.seek(state.frame); state.playing = true })
+            SmallButton(tr("Remove", "حذف برش"), { state.act { removeTrim(t) } })
+        }
+    }
+}
+
+@Composable
+private fun EffectsSection(state: EditorState, t: Target) {
+    val nulls = state.session.effectNullsOf(t.layer)
+    Section(tr("Effects", "افکت‌ها"), defaultOpen = nulls.isNotEmpty()) {
+        for (n in nulls) {
+            val title = state.session.doc.layers.getOrNull(n.index)?.name.orEmpty().removePrefix(ir.sina.tgsstudio.editor.EffectEngine.FX_PREFIX)
+            val label = ir.sina.tgsstudio.editor.EffectKind.entries.firstOrNull { it.title == title }?.let { kindLabel(it) } ?: title
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Ic.Effects, StudioColors.Accent, 18.dp)
+                Text(label, color = StudioColors.TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
+                IconBtn(Ic.Trash, { state.act { removeEffectNull(n) } }, size = 38.dp, iconSize = 18.dp, tint = StudioColors.Danger)
+            }
+        }
+        SmallButton(tr("Add effect…", "افزودن افکت…"), { state.updatePanel(PanelTab.EFFECTS) }, primary = true, modifier = Modifier.padding(top = 6.dp), ic = Ic.Effects)
     }
 }

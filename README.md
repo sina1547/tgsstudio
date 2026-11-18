@@ -27,3 +27,12 @@ Locally: `gradle :document:test :parser:test :renderer:test :editor:test :export
 - `Validator` checks Telegram's published rules (512x512, <=3 s, 60 fps, <=64 KB, prohibited features) and the keyframe structure.
 - `tools/rlottie_check.py` renders the fixtures written by `RlottieFixtureTest` with rlottie and compares them with our renderer.
   This is strong evidence, not a guarantee that Telegram's own apps and servers accept a file.
+
+## Editing features
+- **Parent / child**: real Lottie layer parenting (`ParentOps`). Linking keeps the child where it is on screen (when its transform is static), refuses
+  loops, shows the hierarchy in the Layers panel, and re-parents children when their parent is deleted. "Create parent (Null)" builds a pivot layer.
+- **Trim Paths**: Start/End/Offset with keyframes; quick Draw on / Draw off / Erase from start (`TrimOps`).
+- **Pen**: freehand strokes become editable path layers (colour, width, opacity), optional write-on animation, eraser for pen strokes.
+- **Effects** (`EffectEngine`): fade, zoom, shake, bounce, pulse, rotation, scale, slide, opacity, float, draw on/off, glow. Transform effects animate a
+  Null parent that rests at the identity, so they stack and can be removed; opacity effects compose with existing opacity animation. Blur is refused
+  because TGS forbids layer effects. Custom presets are saved on the device.

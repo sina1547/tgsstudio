@@ -19,7 +19,7 @@ enum class Ic {
     Back, Play, Pause, Prev, Next, Loop, Eye, EyeOff, Lock, Unlock, Undo, Redo, Save, Export, More, Preview,
     Select, Hand, Pen, Node, Rect, Ellipse, Star, Polygon, Text, Svg, Layers, Props, Timeline, Add,
     Close, Plus, Minus, Trash, Copy, Group, Ungroup, Up, Down, Check, Diamond, Folder, Shape, NullLayer, Precomp, Fit,
-    Chevron, ChevronDown, Settings, Info, Path, Key,
+    Chevron, ChevronDown, Settings, Info, Path, Key, Link, Draw, Eraser, Effects,
 }
 
 /** Icons are drawn on a 24-unit grid so the whole set shares one stroke style. */
@@ -97,5 +97,9 @@ private fun DrawScope.drawIcon(ic: Ic, c: Color, u: Float) {
         Ic.Info -> { circle(12f, 12f, 9f); line(12f, 11f, 12f, 17f); circle(12f, 7.5f, 0.6f, true) }
         Ic.Path -> { path({ m(4f, 18f); cubic(8f, 4f, 16f, 4f, 20f, 18f) }); circle(4f, 18f, 1.8f, true); circle(20f, 18f, 1.8f, true) }
         Ic.Key -> path({ m(12f, 4f); l(19f, 12f); l(12f, 20f); l(5f, 12f); close() })
+        Ic.Link -> { rect(3f, 9f, 11f, 6f); rect(10f, 9f, 11f, 6f) }
+        Ic.Draw -> { path({ m(4f, 18f); cubic(7f, 6f, 10f, 22f, 13f, 12f); cubic(15f, 8f, 17f, 8f, 20f, 6f) }); circle(20f, 6f, 1.4f, true) }
+        Ic.Eraser -> { path({ m(4f, 16f); l(11f, 5f); l(20f, 10f); l(13f, 21f); close() }); line(8f, 13f, 16f, 18f) }
+        Ic.Effects -> path({ m(12f, 3f); l(14f, 10f); l(21f, 12f); l(14f, 14f); l(12f, 21f); l(10f, 14f); l(3f, 12f); l(10f, 10f); close() })
     }
 }

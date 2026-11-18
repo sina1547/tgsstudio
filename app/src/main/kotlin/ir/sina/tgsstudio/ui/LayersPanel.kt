@@ -21,6 +21,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sina.tgsstudio.document.LayerNode
 import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.document.LayerType
 import ir.sina.tgsstudio.document.ShapeKind
@@ -63,17 +67,22 @@ private fun buildRows(state: EditorState, expanded: Set<String>): List<LayerRow>
         }
     }
     fun layers(scope: String?, list: List<ir.sina.tgsstudio.document.Layer>, depth: Int) {
-        list.forEachIndexed { i, l ->
+        // the parent/child tree: children sit under their parent (a layer's `parent` field), siblings keep document order
+        fun emit(node: LayerNode, d: Int) {
+            val l = node.layer
+            val i = list.indexOfFirst { it === l }
             val ref = LayerRef(scope, i)
             val key = "l:$scope:$i"
             val icon = when (l.type) { LayerType.SHAPE -> Ic.Shape; LayerType.NULL -> Ic.NullLayer; LayerType.PRECOMP -> Ic.Precomp; else -> Ic.Layers }
-            val expandable = l.type == LayerType.SHAPE || l.type == LayerType.PRECOMP
-            rows += LayerRow(LayerTarget(ref), depth, l.name.ifBlank { "Layer ${l.index ?: i}" }, icon, l.hidden, expandable, key)
+            val expandable = node.children.isNotEmpty() || l.type == LayerType.SHAPE || l.type == LayerType.PRECOMP
+            rows += LayerRow(LayerTarget(ref), d, l.name.ifBlank { "Layer ${l.index ?: i}" }, icon, l.hidden, expandable, key)
             if (key in expanded) {
-                if (l.type == LayerType.SHAPE) shapes(ref, l.shapes, emptyList(), depth + 1)
-                if (l.type == LayerType.PRECOMP) doc.precomps.firstOrNull { it.id == l.refId }?.let { layers(it.id, it.layers, depth + 1) }
+                node.children.forEach { emit(it, d + 1) }
+                if (l.type == LayerType.SHAPE) shapes(ref, l.shapes, emptyList(), d + 1)
+                if (l.type == LayerType.PRECOMP) doc.precomps.firstOrNull { it.id == l.refId }?.let { layers(it.id, it.layers, d + 1) }
             }
         }
+        LayerNode.build(list).forEach { emit(it, depth) }
     }
     layers(null, doc.layers, 0)
     return rows
@@ -87,6 +96,8 @@ fun LayersPanel(state: EditorState) {
     val rows = remember(tick, expanded.toList()) { buildRows(state, expanded.toSet()) }
     var renaming by remember { mutableStateOf<Target?>(null) }
     var menuFor by remember { mutableStateOf<String?>(null) }
+    var picking by remember { mutableStateOf<List<LayerRef>?>(null) }
+    val selectedLayers = state.session.selection.filterIsInstance<LayerTarget>().map { it.layer }
     val rowHeight = 48.dp
     val rowPx = with(LocalDensity.current) { rowHeight.toPx() }
 
@@ -96,6 +107,7 @@ fun LayersPanel(state: EditorState) {
             Text(tr("Layers", "لایه‌ها"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp).weight(1f))
             SmallButton(tr("Multi", "چندتایی"), { state.multiSelect = !state.multiSelect }, primary = state.multiSelect)
             Spacer(Modifier.width(6.dp))
+            if (selectedLayers.isNotEmpty()) { SmallButton(tr("Parent", "والد"), { picking = selectedLayers }, ic = Ic.Link); Spacer(Modifier.width(6.dp)) }
             SmallButton(tr("Group", "گروه"), { handleResult(state, state.act { groupSelection() }) }, enabled = state.session.selection.count { it is ShapeTarget } >= 1)
             Spacer(Modifier.width(6.dp))
             IconBtn(Ic.Plus, { state.updatePanel(PanelTab.ADD) }, size = 38.dp, iconSize = 20.dp)
@@ -141,6 +153,12 @@ fun LayersPanel(state: EditorState) {
                         DropdownMenu(menuFor == row.key, { menuFor = null }, containerColor = StudioColors.PanelRaised) {
                             @Composable fun item(label: String, onClick: () -> Unit) = DropdownMenuItem(text = { Text(label, color = StudioColors.TextPrimary) }, onClick = { menuFor = null; onClick() })
                             item(tr("Rename", "تغییر نام")) { renaming = row.target }
+                            if (row.target is LayerTarget) {
+                                val sel = if (row.target.layer in selectedLayers) selectedLayers else listOf(row.target.layer)
+                                item(tr("Set parent…", "تعیین والد…")) { picking = sel }
+                                if (sel.any { state.session.parentOf(it) != null }) item(tr("Detach from parent", "جدا کردن از والد")) { reportParent(state, state.act { setParent(sel, null) }, expanded, null) }
+                                item(tr("Create parent (Null)", "ساخت والد (Null)")) { state.act { createNullParent(sel) } }
+                            }
                             item(tr("Duplicate", "تکثیر")) { state.act { select(listOf(row.target)); duplicateSelection() } }
                             item(tr("Move up", "بالا بردن")) { state.act { move(row.target, -1) } }
                             item(tr("Move down", "پایین بردن")) { state.act { move(row.target, 1) } }
@@ -156,6 +174,13 @@ fun LayersPanel(state: EditorState) {
                 }
             }
         }
+    }
+
+    picking?.let { kids ->
+        ParentPickerDialog(state, kids, onPick = { parent ->
+            picking = null
+            reportParent(state, state.act { setParent(kids, parent) }, expanded, parent)
+        }, onDismiss = { picking = null })
     }
 
     renaming?.let { t ->
@@ -189,3 +214,47 @@ internal object Targets2 {
 @Composable
 internal fun Column2(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) =
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth(), content = content)
+
+/** Tells the user what a parent/detach operation did; opens the parent so the new hierarchy is visible. */
+internal fun reportParent(state: EditorState, r: ir.sina.tgsstudio.editor.ParentResult, expanded: MutableList<String>, parent: LayerRef?) {
+    if (r.refused != null) {
+        state.message = when (r.refused) {
+            OpResult.Reason.WOULD_NEST_INTO_SELF -> if (state.isFa) "این اتصال یک حلقه می‌سازد: یک لایه نمی‌تواند والدِ والدِ خودش باشد." else "That would create a loop: a layer can't be the parent of its own parent."
+            else -> if (state.isFa) "این اتصال ممکن نیست." else "That link isn't possible."
+        }
+    } else {
+        parent?.let { p -> val k = "l:${p.scope}:${p.index}"; if (k !in expanded) expanded.add(k) }
+        state.message = when {
+            r.movedLayers.isNotEmpty() -> if (state.isFa) "${r.movedLayers.size} لایه انیمیشن یا کجی دارند؛ مقدارهایشان حفظ شد و ممکن است جابه‌جا شوند." else "${r.movedLayers.size} layer(s) have animation or skew; their values were kept, so they may shift."
+            parent == null -> if (state.isFa) "از والد جدا شد؛ جایش تغییر نکرد." else "Detached; position unchanged."
+            else -> if (state.isFa) "وصل شد؛ جای لایه تغییر نکرد." else "Linked; position unchanged."
+        }
+    }
+    state.changed()
+}
+
+@Composable
+private fun ParentPickerDialog(state: EditorState, children: List<LayerRef>, onPick: (LayerRef?) -> Unit, onDismiss: () -> Unit) {
+    val doc = state.session.doc
+    val candidates = remember(state.tick, children) { state.session.parentCandidates(children) }
+    val names = remember(state.tick) { doc.layers.map { it.name.ifBlank { "Layer" } } }
+    AlertDialog(
+        onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
+        title = { Text(tr("Choose a parent", "والد را انتخاب کنید"), color = StudioColors.TextPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    tr("The layer follows its parent's movement, rotation and scale and keeps its place. Opacity is not inherited.", "لایه حرکت، چرخش و اندازهٔ والد را دنبال می‌کند و جایش تغییر نمی‌کند. شفافیت منتقل نمی‌شود."),
+                    color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp),
+                )
+                Text(tr("None (detach)", "هیچ‌کدام (جدا کردن)"), color = StudioColors.Danger, modifier = Modifier.fillMaxWidth().clickable { onPick(null) }.padding(vertical = 12.dp))
+                candidates.forEach { c ->
+                    Text(names.getOrElse(c.index) { "Layer" }, color = StudioColors.TextPrimary, modifier = Modifier.fillMaxWidth().clickable { onPick(c) }.padding(vertical = 12.dp))
+                }
+                if (candidates.isEmpty()) Text(tr("No other layer can be a parent.", "لایهٔ دیگری برای والد شدن نیست."), color = StudioColors.TextMuted)
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onDismiss) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
+    )
+}

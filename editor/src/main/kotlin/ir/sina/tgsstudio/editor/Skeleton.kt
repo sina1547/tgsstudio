@@ -124,7 +124,7 @@ object Skeleton {
     }
 
     /** Smooth Bézier through the points; sharp turns (> 50°) stay corners. */
-    fun fit(pts: List<Pair<Double, Double>>, loop: Boolean): Bezier? {
+    fun fit(pts: List<Pair<Double, Double>>, loop: Boolean, cornerDegrees: Double = 50.0): Bezier? {
         var p = pts
         if (loop && p.size > 2) p = p.dropLast(1)
         val n = p.size
@@ -139,7 +139,7 @@ object Skeleton {
             if (hasPrev && hasNext) {
                 val ax = c.first - pr.first; val ay = c.second - pr.second; val bx = nx.first - c.first; val by = nx.second - c.second
                 val cos = ((ax * bx + ay * by) / (hypot(ax, ay) * hypot(bx, by)).coerceAtLeast(1e-9)).coerceIn(-1.0, 1.0)
-                if (Math.toDegrees(acos(cos)) > 50.0) continue   // corner: handles stay zero
+                if (Math.toDegrees(acos(cos)) > cornerDegrees) continue   // corner: handles stay zero
                 var tx = nx.first - pr.first; var ty = nx.second - pr.second
                 val tl = hypot(tx, ty).coerceAtLeast(1e-9); tx /= tl; ty /= tl
                 outs[2 * i] = tx * lenNext / 3; outs[2 * i + 1] = ty * lenNext / 3

@@ -36,7 +36,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sqrt
 
-private enum class Mode { NONE, PAN, MOVE, SCALE, ROTATE, NODE_VERTEX, NODE_HANDLE_IN, NODE_HANDLE_OUT, SHAPE, PEN, PINCH }
+private enum class Mode { NONE, PAN, MOVE, SCALE, ROTATE, NODE_VERTEX, NODE_HANDLE_IN, NODE_HANDLE_OUT, SHAPE, PEN, DRAW, ERASE, PINCH }
 
 private fun checkerTile(): ImageBitmap {
     val bmp = ImageBitmap(32, 32)
@@ -92,6 +92,15 @@ private fun DrawScope.drawOverlay(state: EditorState, box: Box?, density: Float)
     }
     if (state.tool == Tool.NODE) drawNodes(state, density)
     state.penPath?.let { b -> drawPenPreview(state, b, density) }
+    if (state.drawPoints.size >= 2) {
+        val c = state.penColor
+        val path = androidx.compose.ui.graphics.Path()
+        state.drawPoints.forEachIndexed { i, p -> val sp = state.toScreen(p.x.toDouble(), p.y.toDouble()); if (i == 0) path.moveTo(sp.x, sp.y) else path.lineTo(sp.x, sp.y) }
+        drawPath(
+            path, Color(c.r.toFloat().coerceIn(0f, 1f), c.g.toFloat().coerceIn(0f, 1f), c.b.toFloat().coerceIn(0f, 1f), (state.penOpacity / 100f).coerceIn(0.05f, 1f)),
+            style = Stroke(width = state.penWidth * state.viewScale, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round),
+        )
+    }
     state.dragRect?.let { (a, b) ->
         val p0 = state.toScreen(a.x.toDouble(), a.y.toDouble()); val p1 = state.toScreen(b.x.toDouble(), b.y.toDouble())
         drawRect(accent, Offset(minOf(p0.x, p1.x), minOf(p0.y, p1.y)), Size(kotlin.math.abs(p1.x - p0.x), kotlin.math.abs(p1.y - p0.y)), style = Stroke(1.5f * density))
@@ -149,7 +158,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
     val hitRadius = 22f * density
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        val tool = state.tool
+        val tool = if (state.fxPreviewing) Tool.HAND else state.tool   // while an effect preview is open the canvas only pans
         val session = state.session
         var mode = Mode.NONE
         var last = down.position
@@ -226,6 +235,11 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                 } else { state.penPath = PathOps.append(cur, startDoc.x.toDouble(), startDoc.y.toDouble()); mode = Mode.PEN }
             }
             Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
+            Tool.DRAW -> { mode = Mode.DRAW; state.drawPoints = listOf(startDoc) }
+            Tool.ERASE -> {
+                mode = Mode.ERASE; session.beginGesture("Erase")
+                if (session.eraseStrokeAt(startDoc.x.toDouble(), startDoc.y.toDouble(), (hitRadius / state.viewScale).toDouble())) state.changed()
+            }
         }
 
         // ---- event loop ----
@@ -233,7 +247,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
             val event = awaitPointerEvent()
             val pressed = event.changes.count { it.pressed }
             if (pressed >= 2) {
-                if (mode != Mode.PINCH) { if (session.history.isGestureOpen) { session.endGesture(); state.changed() }; state.dragRect = null; mode = Mode.PINCH }
+                if (mode != Mode.PINCH) { if (session.history.isGestureOpen) { session.endGesture(); state.changed() }; state.dragRect = null; state.drawPoints = emptyList(); mode = Mode.PINCH }
                 state.zoomPan(event.calculateCentroid(), event.calculateZoom(), event.calculatePan())
                 event.changes.forEach { it.consume() }
                 continue
@@ -252,6 +266,8 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     } else if (travelled < slop && tool == Tool.NODE) { state.nodeIndex = -1; state.changed() }
                     Mode.MOVE, Mode.SCALE, Mode.ROTATE, Mode.NODE_VERTEX, Mode.NODE_HANDLE_IN, Mode.NODE_HANDLE_OUT -> { session.endGesture(); state.changed() }
                     Mode.SHAPE -> finishShape(state, tool, startDoc, doc)
+                    Mode.DRAW -> finishDraw(state)
+                    Mode.ERASE -> { session.endGesture(); state.changed() }
                     Mode.PEN -> state.changed()
                     Mode.PINCH -> Unit
                 }
@@ -283,6 +299,11 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     }
                 }
                 Mode.SHAPE -> state.dragRect = startDoc to doc
+                Mode.DRAW -> {
+                    val prev = state.drawPoints.lastOrNull()
+                    if (prev == null || hypot((doc.x - prev.x).toDouble(), (doc.y - prev.y).toDouble()) * state.viewScale >= 1.5) state.drawPoints = state.drawPoints + doc
+                }
+                Mode.ERASE -> if (session.eraseStrokeAt(doc.x.toDouble(), doc.y.toDouble(), (hitRadius / state.viewScale).toDouble())) state.changed()
                 Mode.PEN -> state.penPath?.let { b ->
                     val i = b.count - 1
                     if (i >= 0 && travelled > slop) {
@@ -317,4 +338,21 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
         }
     }
     state.tool = Tool.SELECT
+}
+
+/** Pen up: fit the touch points into a path layer; with write-on, time it from the playhead (or right after the previous stroke). */
+private fun finishDraw(state: EditorState) {
+    val pts = state.drawPoints.map { it.x.toDouble() to it.y.toDouble() }
+    state.drawPoints = emptyList()
+    if (pts.size < 2) return
+    val doc = state.session.doc
+    var writeOn: ir.sina.tgsstudio.editor.WriteOn? = null
+    if (state.penWriteOn) {
+        val wanted = ir.sina.tgsstudio.editor.Freehand.length(pts) / state.penSpeed.coerceAtLeast(1f)
+        val start = Math.rint(state.penNextStart?.takeIf { state.frame <= it } ?: state.frame)
+        val frames = Math.rint(minOf(wanted.coerceIn(8.0, 120.0), doc.outPoint - 1 - start))
+        if (frames >= 2.0) { writeOn = ir.sina.tgsstudio.editor.WriteOn(start, frames); state.penNextStart = start + frames }
+        else state.message = if (state.isFa) "جایی برای انیمیشن نوشتن در خط زمان نمانده است." else "No room left on the timeline for a write-on animation."
+    }
+    state.act { addStroke(pts, state.penColor, state.penWidth.toDouble(), state.penOpacity.toDouble(), writeOn) }
 }

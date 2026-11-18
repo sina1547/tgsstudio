@@ -3,6 +3,7 @@ package ir.sina.tgsstudio.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,6 +64,12 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
             AddTile(Ic.NullLayer, tr("Null", "لایهٔ خالی"), {
                 state.act { edit("Add null") { val l = Creator.nullLayer(doc, doc.root.arr("layers"), "Null"); Creator.insertLayer(doc, null, l) } }
             }, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AddTile(Ic.Draw, tr("Draw", "نقاشی"), { state.tool = Tool.DRAW; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
+            AddTile(Ic.Eraser, tr("Eraser", "پاک‌کن"), { state.tool = Tool.ERASE; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
+            AddTile(Ic.Effects, tr("Effects", "افکت‌ها"), { state.updatePanel(PanelTab.EFFECTS) }, Modifier.weight(1f))
+            Box(Modifier.weight(1f))
         }
     }
 }

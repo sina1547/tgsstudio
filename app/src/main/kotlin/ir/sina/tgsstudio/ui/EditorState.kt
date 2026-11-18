@@ -11,10 +11,12 @@ import ir.sina.tgsstudio.data.AppPrefs
 import ir.sina.tgsstudio.document.json.JsonObj
 import ir.sina.tgsstudio.editor.EditorSession
 import ir.sina.tgsstudio.renderer.Bezier
+import ir.sina.tgsstudio.renderer.Rgba
+import ir.sina.tgsstudio.editor.Target
 
-enum class Tool { SELECT, HAND, PEN, NODE, RECT, ELLIPSE, STAR, POLYGON }
+enum class Tool { SELECT, HAND, PEN, NODE, RECT, ELLIPSE, STAR, POLYGON, DRAW, ERASE }
 enum class Workspace { DESIGN, ANIMATION, ADVANCED }
-enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, ADD }
+enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, ADD, EFFECTS }
 
 /**
  * UI state of one open project. The document itself lives in [session] (pure Kotlin); this class only
@@ -71,6 +73,19 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     // pen tool and shape dragging
     var penPath by mutableStateOf<Bezier?>(null)
     var dragRect by mutableStateOf<Pair<Offset, Offset>?>(null)
+
+    // freehand pen: settings, the stroke being drawn (document coordinates), and where the next write-on stroke starts
+    var penColor by mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0))
+    var penWidth by mutableFloatStateOf(8f)
+    var penOpacity by mutableFloatStateOf(100f)
+    var penWriteOn by mutableStateOf(false)
+    var penSpeed by mutableFloatStateOf(10f)          // pixels of path drawn per frame during write-on
+    var drawPoints by mutableStateOf<List<Offset>>(emptyList())
+    var penNextStart: Double? = null
+
+    // effect preview: the effect is applied inside an open history gesture so it can be kept or discarded
+    var fxPreviewing by mutableStateOf(false)
+    var fxSelectionBefore: List<Target> = emptyList()
 
     // node editor
     var nodeIndex by mutableIntStateOf(-1)

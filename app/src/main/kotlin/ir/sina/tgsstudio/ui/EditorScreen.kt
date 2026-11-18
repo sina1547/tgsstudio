@@ -153,7 +153,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 
             Ltr { PlaybackBar(state) }
 
-            if (!state.previewMode && state.panel != null && (!wide || state.panel == PanelTab.ADD)) {
+            if (!state.previewMode && state.panel != null && (!wide || state.panel == PanelTab.ADD || state.panel == PanelTab.EFFECTS)) {
                 Column(Modifier.fillMaxWidth().height(state.panelHeightDp.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(StudioColors.Panel)) {
                     PanelHandle(state, maxPanel)
                     Box(Modifier.weight(1f)) {
@@ -162,6 +162,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                             PanelTab.PROPERTIES -> PropertiesPanel(state)
                             PanelTab.TIMELINE -> TimelinePanel(state)
                             PanelTab.ADD -> AddPanel(state, { svgPicker.launch(arrayOf("*/*")) }, { showText = true })
+                            PanelTab.EFFECTS -> EffectsPanel(state)
                             null -> Unit
                         }
                     }
@@ -211,7 +212,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 
 @Composable
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
-    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon)
+    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
     Row(Modifier.fillMaxWidth().background(StudioColors.Background).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         tools.forEach { (t, ic) -> IconBtn(ic, { state.tool = t; if (t != Tool.PEN) state.penPath = null; state.changed() }, active = state.tool == t, size = 42.dp) }
         IconBtn(Ic.Text, onText, size = 42.dp)
@@ -232,6 +233,10 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
+        if (state.tool == Tool.DRAW) PenSettingsBar(state)
+        if (state.tool == Tool.ERASE) {
+            Text(tr("Drag over pen strokes to erase them. Shapes are never erased.", "روی خط‌های قلم بکشید تا پاک شوند. شکل‌ها پاک نمی‌شوند."), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 8.dp))
+        }
         if (state.tool == Tool.PEN) {
             Ltr {
                 Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -318,4 +323,31 @@ private fun Dock(state: EditorState) {
             }
         }
     }
+}
+
+/** Colour, thickness, opacity and write-on options of the freehand pen. */
+@Composable
+private fun PenSettingsBar(state: EditorState) {
+    var picking by remember { mutableStateOf(false) }
+    Column(Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Swatch(state.penColor.toColor(), { picking = true }, size = 32.dp)
+            Column(Modifier.weight(1f)) {
+                Text("${tr("Width", "ضخامت")} ${fmt(state.penWidth.toDouble(), 0)}", color = StudioColors.TextMuted, fontSize = 11.sp)
+                GestureSlider(state.penWidth, 1f..40f, {}, { state.penWidth = it }, {})
+            }
+            Column(Modifier.weight(1f)) {
+                Text("${tr("Opacity", "شفافیت")} ${fmt(state.penOpacity.toDouble(), 0)}%", color = StudioColors.TextMuted, fontSize = 11.sp)
+                GestureSlider(state.penOpacity, 10f..100f, {}, { state.penOpacity = it }, {})
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SmallButton(tr("Write-on", "نوشته‌شدن تدریجی"), { state.penWriteOn = !state.penWriteOn; state.penNextStart = null }, primary = state.penWriteOn, ic = Ic.Draw)
+            if (state.penWriteOn) Column(Modifier.weight(1f)) {
+                Text("${tr("Speed", "سرعت")} ${fmt(state.penSpeed.toDouble(), 0)} px/f", color = StudioColors.TextMuted, fontSize = 11.sp)
+                GestureSlider(state.penSpeed, 2f..40f, {}, { state.penSpeed = it }, {})
+            } else Text(tr("Each stroke is drawn gradually when on.", "وقتی روشن است هر خط به‌تدریج کشیده می‌شود."), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+        }
+    }
+    if (picking) ColorPickerDialog(state.penColor, { state.penColor = it }, { picking = false })
 }

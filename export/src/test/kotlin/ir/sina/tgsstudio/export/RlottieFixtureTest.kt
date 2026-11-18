@@ -133,6 +133,71 @@ class RlottieFixtureTest {
         write("pen_open_move", s.doc, listOf(moved(0, 90, 70.0), moved(0, 45, 30.0)), listOf(0, 45, 90), 0.85)
     }
 
+    @Test fun parenting() {
+        run { // a Null at (256,256) rotates 0 -> 90 and carries a child that sits at (356,256): the child orbits the null
+            val s = fresh(); val kid = s.addRect(356.0, 256.0, 80.0, 50.0)!!
+            val nullRef = s.createNullParent(listOf(kid.layer))!!
+            // createNullParent centres the null on the child itself; move the pivot to (256,256) the way a user would: re-create at the child's offset
+            val nt = LayerTarget(nullRef)
+            s.edit("pivot") {
+                val ks = s.index.layerRaw(nullRef)!!.obj("ks")!!
+                ks["p"] = staticProp(256.0, 256.0, 0.0); ks["a"] = staticProp(256.0, 256.0, 0.0)
+            }
+            s.frame = 0.0; s.addKeyframe(s.key(nt, "r")); s.frame = 90.0; s.setRotation(nt, 90.0)
+            val r = 100.0
+            write("parent_null_orbit", s.doc, listOf(
+                centroid(0, 356.0, 256.0), centroid(45, 256.0 + r * Math.cos(PI / 4), 256.0 + r * Math.sin(PI / 4), 3.0), centroid(90, 256.0, 356.0), bbox(90, 50.0, 80.0)), listOf(0, 30, 45, 60, 90))
+        }
+        run { // a visible parent that moves, scales and turns; the child keeps its own look but follows
+            val s = fresh()
+            val kid0 = s.addRect(350.0, 300.0, 60.0, 40.0)!!; s.rename(kid0, "kid"); s.setRotation(kid0, 15.0)
+            val par0 = s.addRect(200.0, 200.0, 100.0, 70.0)!!; s.rename(par0, "par"); s.setScale(par0, 130.0, 130.0); s.setRotation(par0, 20.0)
+            fun ref(n: String) = LayerRef(null, s.doc.layers.indexOfFirst { it.name == n })
+            val r = s.setParent(listOf(ref("kid")), ref("par"))
+            check(r.keptPosition == 1) { "expected position to be kept: $r" }
+            val parent = LayerTarget(ref("par"))
+            s.frame = 0.0
+            for (k in listOf("p", "s", "r")) s.addKeyframe(s.key(parent, k))
+            s.frame = 90.0; s.setPosition(parent, 300.0, 250.0); s.setScale(parent, 80.0, 80.0); s.setRotation(parent, 110.0)
+            write("parent_follows", s.doc, listOf(moved(0, 90, 40.0)), listOf(0, 30, 60, 90), 0.9)
+        }
+    }
+
+    @Test fun effects() {
+        fun fx(name: String, kind: EffectKind, p: EffectParams, frames: List<Int>, checks: (EditorSession) -> List<String> = { emptyList() }, minIou: Double = 0.9) {
+            val s = fresh(); val t = s.addRect(256.0, 256.0, 100.0, 60.0, Rgba(1.0, 1.0, 1.0, 1.0))!!
+            s.select(listOf(t)); s.applyEffect(kind, p)
+            write("fx_$name", s.doc, checks(s), frames, minIou)
+        }
+        fx("zoom_in", EffectKind.ZOOM_IN, EffectParams(0.0, 30.0), listOf(0, 10, 20, 30), { listOf(bbox(0, 20.0, 12.0, 3.0), bbox(30, 100.0, 60.0), centroid(0, 256.0, 256.0)) })
+        fx("zoom_out", EffectKind.ZOOM_OUT, EffectParams(0.0, 30.0), listOf(0, 15, 30), { listOf(bbox(0, 100.0, 60.0), bbox(30, 20.0, 12.0, 3.0)) })
+        fx("slide_in", EffectKind.SLIDE_IN, EffectParams(0.0, 30.0, direction = 0), listOf(0, 10, 20, 30), { listOf(centroid(0, 56.0, 256.0), centroid(30, 256.0, 256.0)) })
+        fx("shake", EffectKind.SHAKE, EffectParams(0.0, 40.0), listOf(0, 7, 14, 21, 28, 35, 40), { listOf(centroid(40, 256.0, 256.0, 1.5)) })
+        fx("bounce", EffectKind.BOUNCE, EffectParams(0.0, 60.0), listOf(0, 12, 24, 40, 52, 60), { listOf(centroid(0, 256.0, 136.0), centroid(24, 256.0, 256.0, 3.0), centroid(60, 256.0, 256.0)) })
+        fx("pulse", EffectKind.PULSE, EffectParams(0.0, 40.0, loop = true), listOf(0, 10, 20, 30, 60), { listOf(bbox(20, 115.0, 69.0, 3.0), bbox(40, 100.0, 60.0)) })
+        fx("rotate", EffectKind.ROTATE, EffectParams(0.0, 40.0, direction = 1, loop = true), listOf(0, 5, 10, 15, 25, 40), { listOf(bbox(10, 60.0, 100.0, 4.0), bbox(40, 100.0, 60.0)) })
+        fx("float", EffectKind.FLOAT, EffectParams(0.0, 60.0, loop = true), listOf(0, 15, 30, 45, 60), { listOf(centroid(15, 256.0, 246.0, 2.0), centroid(45, 256.0, 266.0, 2.0)) })
+        fx("scale", EffectKind.SCALE, EffectParams(0.0, 30.0), listOf(0, 15, 30), { listOf(bbox(30, 150.0, 90.0, 3.0)) })
+        fx("fade_in", EffectKind.FADE_IN, EffectParams(10.0, 30.0), listOf(0, 10, 25, 40, 60), { listOf(alphaMax(0, 0.0, 2.0), alphaMax(40, 255.0, 2.0)) })
+        fx("fade_out", EffectKind.FADE_OUT, EffectParams(10.0, 30.0), listOf(0, 10, 25, 40, 60), { listOf(alphaMax(0, 255.0, 2.0), alphaMax(40, 0.0, 2.0)) })
+        fx("opacity", EffectKind.OPACITY, EffectParams(0.0, 40.0, loop = true), listOf(0, 10, 20, 30, 40), { listOf(alphaMax(20, 76.5, 4.0), alphaMax(40, 255.0, 2.0)) })
+        run { // everything stacked: the same layer zooms in, spins once and fades in
+            val s = fresh(); val t = s.addRect(256.0, 256.0, 100.0, 60.0, Rgba(1.0, 1.0, 1.0, 1.0))!!; s.select(listOf(t))
+            s.applyEffect(EffectKind.ZOOM_IN, EffectParams(0.0, 40.0)); s.applyEffect(EffectKind.ROTATE, EffectParams(0.0, 40.0, direction = 1)); s.applyEffect(EffectKind.FADE_IN, EffectParams(0.0, 20.0))
+            write("fx_stacked", s.doc, listOf(alphaMax(0, 0.0, 2.0), alphaMax(30, 255.0, 2.0), bbox(40, 100.0, 60.0)), listOf(5, 10, 15, 20, 30, 40), 0.88)
+        }
+        run { // glow and draw-on
+            val s = fresh(); val t = s.addEllipse(256.0, 256.0, 160.0, 160.0, Rgba(0.2, 0.6, 1.0, 1.0))!!; s.select(listOf(t))
+            s.applyEffect(EffectKind.GLOW, EffectParams(0.0, 60.0, 100.0, loop = true))
+            write("fx_glow", s.doc, listOf(ink(0, 20000.0, 0.5)), listOf(0, 20, 30, 45), 0.9)
+        }
+        run {
+            val s = fresh(); val t = s.addStroke(List(60) { (120.0 + it * 4) to (256.0 + 60 * Math.sin(it / 8.0)) }, Rgba(1.0, 1.0, 1.0, 1.0), 12.0)!!; s.select(listOf(t))
+            s.applyEffect(EffectKind.DRAW_ON, EffectParams(0.0, 60.0))
+            write("fx_draw_on", s.doc, listOf(ink(0, 0.0, 0.0001), inkRatio(30, 70, 0.5, 0.08)), listOf(0, 15, 30, 45, 60), 0.85)
+        }
+    }
+
     private fun ringDoc(build: (EditorSession, ShapeTarget) -> Unit): LottieDocument {
         val s = fresh()
         val trim = obj("ty" to str("tm"), "s" to staticProp(0.0), "e" to staticProp(100.0), "o" to staticProp(0.0), "m" to int(1), "nm" to str("Trim Paths 1"))

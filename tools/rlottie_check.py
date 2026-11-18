@@ -3,7 +3,7 @@
 
 Two kinds of check per fixture (see `<name>.expect.json`):
   * analytic: centroid / bounding box / opacity / ink area at given frames
-  * cross-render: IoU between rlottie's frame and this project's own renderer (exported as SVG, drawn with cairosvg)
+  * cross-render: alpha-weighted overlap (soft IoU) between rlottie's frame and this project's own renderer (exported as SVG, drawn with cairosvg)
 
 rlottie is the renderer family Telegram's players are based on. Passing here is strong evidence, not a guarantee
 that Telegram's own apps or servers accept a file.
@@ -83,9 +83,10 @@ def main(d):
             results.append(run_check(c, cache, anim))
         for f in exp.get("iou_frames", []):
             svg = os.path.join(d, f"{name}.f{f}.svg")
-            a, b = render(anim, f) > 20, svg_alpha(svg) > 20
-            union = int((a | b).sum()); iou = (int((a & b).sum()) / union) if union else 1.0
-            results.append((iou >= exp["min_iou"], f"IoU(rlottie, our renderer)@{f} = {iou:.3f} want >= {exp['min_iou']}"))
+            # alpha-weighted Jaccard (sum of min / sum of max): no threshold, so faint translucent halos (glow) compare fairly
+            a, b = render(anim, f).astype(np.float64), svg_alpha(svg).astype(np.float64)
+            denom = float(np.maximum(a, b).sum()); iou = float(np.minimum(a, b).sum()) / denom if denom else 1.0
+            results.append((iou >= exp["min_iou"], f"similarity(rlottie, our renderer)@{f} = {iou:.3f} want >= {exp['min_iou']}"))
         if exp.get("characterization"):
             characterizations.append((name, all(ok for ok, _ in results)))
             print(f"INFO {name}: invalid keyframes are {'ACCEPTED' if all(ok for ok, _ in results) else 'dropped'} by this rlottie build")
