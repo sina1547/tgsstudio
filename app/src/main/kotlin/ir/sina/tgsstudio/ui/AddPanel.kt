@@ -97,7 +97,7 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
             val dir = File(context.filesDir, "fonts").apply { mkdirs() }
             val ext = uri.lastPathSegment?.substringAfterLast('.', "ttf")?.lowercase()?.takeIf { it in setOf("ttf", "otf") } ?: "ttf"
             val file = File(dir, "font_${System.currentTimeMillis()}.$ext")
-            context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { output -> input.copyTo(output) } } ?: error("Cannot read font")
+            context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { output -> input.copyTo(output) } } ?: throw IllegalStateException("Cannot read font")
             Typeface.createFromFile(file)
             fontPath = file.absolutePath
             fontLabel = uri.lastPathSegment?.substringAfterLast('/') ?: file.name
