@@ -12,7 +12,7 @@ import ir.sina.tgsstudio.document.json.deepCopy
 sealed interface OpResult {
     data class Ok(val ref: Any? = null) : OpResult
     data class Refused(val reason: Reason) : OpResult
-    enum class Reason { NOT_FOUND, GROUP_HAS_TRANSFORM, WOULD_NEST_INTO_SELF, LAST_ITEM, INVALID }
+    enum class Reason { NOT_FOUND, GROUP_HAS_TRANSFORM, WOULD_NEST_INTO_SELF, LAST_ITEM, INCOMPATIBLE, INVALID }
 }
 
 object LayerOps {
@@ -43,6 +43,21 @@ object LayerOps {
         copy.putString("nm", (src.string("nm") ?: "Layer") + " copy")
         arr.items.add(ref.index, copy)
         return OpResult.Ok(LayerRef(ref.scope, ref.index))
+    }
+
+    /**
+     * Replaces only the vector artwork of a shape layer. The destination's transform, timing,
+     * parenting, visibility, blend mode and identity remain untouched.
+     */
+    fun replaceContents(idx: DocIndex, target: LayerRef, source: LayerRef): OpResult {
+        if (target == source || target.scope != source.scope) return OpResult.Refused(OpResult.Reason.INVALID)
+        val arr = idx.layerArray(target.scope) ?: return OpResult.Refused(OpResult.Reason.NOT_FOUND)
+        val dst = arr.items.getOrNull(target.index) as? JsonObj ?: return OpResult.Refused(OpResult.Reason.NOT_FOUND)
+        val src = arr.items.getOrNull(source.index) as? JsonObj ?: return OpResult.Refused(OpResult.Reason.NOT_FOUND)
+        if (dst.int("ty") != 4 || src.int("ty") != 4) return OpResult.Refused(OpResult.Reason.INCOMPATIBLE)
+        val shapes = src.arr("shapes") ?: return OpResult.Refused(OpResult.Reason.INCOMPATIBLE)
+        dst["shapes"] = shapes.deepCopy()
+        return OpResult.Ok(LayerRef(target.scope, target.index))
     }
 
     /** Moves a layer to [newIndex] in its composition (0 = top). Returns its new ref. */
