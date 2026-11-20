@@ -248,7 +248,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                                     val event = awaitPointerEvent()
                                                     val change = event.changes.first()
                                                     if (change.changedToUp()) { change.consume(); break }
-                                                    val rawDelta = Math.rint((change.position.x - down.position.x) / ppf)
+                                                    val rawDelta = Math.rint(((change.position.x - down.position.x) / ppf).toDouble())
                                                     if (kotlin.math.abs(change.position.x - down.position.x) > 6f * density) {
                                                         if (!gestureStarted) {
                                                             state.session.beginGesture("Move layer")
