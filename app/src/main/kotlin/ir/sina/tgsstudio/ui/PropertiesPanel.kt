@@ -64,6 +64,7 @@ fun PropertiesPanel(state: EditorState) {
             return@Column
         }
         key(tick) { TransformSection(state, target) }
+        if (target is LayerTarget) key(tick) { LayerTimingSection(state, target) }
         key(tick) { AppearanceSection(state, target) }
         key(tick) { ShapeSection(state, target) }
         key(tick) { TrimSection(state, target) }
@@ -71,6 +72,22 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { AnimationSection(state, target) }
         key(tick) { EffectsSection(state, target) }
         key(tick) { AdvancedSection(state, target) }
+    }
+}
+
+@Composable
+private fun LayerTimingSection(state: EditorState, target: LayerTarget) {
+    val timing = state.session.layerTiming(target.layer) ?: return
+    Section(tr("Layer timing", "زمان‌بندی لایه"), defaultOpen = false) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(timing.inPoint, { state.act { setLayerTiming(target.layer, timing.copy(inPoint = it)) } }, Modifier.weight(1f), decimals = 0, label = "In")
+            NumberField(timing.outPoint, { state.act { setLayerTiming(target.layer, timing.copy(outPoint = it)) } }, Modifier.weight(1f), decimals = 0, label = "Out")
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(timing.startTime, { state.act { setLayerTiming(target.layer, timing.copy(startTime = it)) } }, Modifier.weight(1f), decimals = 1, label = "Start")
+            NumberField(timing.stretch, { state.act { setLayerTiming(target.layer, timing.copy(stretch = it)) } }, Modifier.weight(1f), decimals = 2, label = "Stretch")
+        }
+        Text(tr("Timing values are in composition frames; stretch 1.0 is normal speed.", "مقادیر زمان برحسب فریم کامپوزیشن هستند؛ ضریب ۱ سرعت عادی است."), color = StudioColors.TextMuted, fontSize = 11.sp)
     }
 }
 
