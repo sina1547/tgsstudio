@@ -49,6 +49,8 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ### M4 — Masks, effects and renderer compatibility
 - [ ] UI for creating/editing/animating masks (add, subtract, intersect, difference, inverted).
+- [x] Initial Add-mode mask creation from a same-layer top-level vector path, inversion and removal.
+- [ ] Subtract/intersect/difference modes, feather, expansion and mask path animation.
 - [ ] Feather, expansion and mask opacity where format/runtime support permits.
 - [ ] Expand Lottie compatibility tests for image assets, text, mattes, blend modes, repeater, merge paths, time remap and modifiers.
 - [ ] Preserve unknown nodes and unsupported effects without destructive rewrites.
@@ -70,7 +72,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
-The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates, plus basic Add-mode mask creation from a top-level path with inversion/removal. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 
