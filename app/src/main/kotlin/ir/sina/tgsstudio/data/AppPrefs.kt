@@ -19,6 +19,16 @@ class AppPrefs(context: Context) {
         else -> if (Locale.getDefault().language == "fa") Lang.FA else Lang.EN
     }
 
+    /** dark, light, neon or custom. */
+    var themeSetting: String
+        get() = sp.getString("theme", "dark") ?: "dark"
+        set(v) { sp.edit().putString("theme", v).apply() }
+
+    /** Six-digit RGB accent used by the custom theme. */
+    var themeAccent: String
+        get() = sp.getString("themeAccent", "1E7BFF") ?: "1E7BFF"
+        set(v) { sp.edit().putString("themeAccent", v.filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }.take(6)).apply() }
+
     var openPanel: String
         get() = sp.getString("panel", "layers") ?: "layers"
         set(v) { sp.edit().putString("panel", v).apply() }
