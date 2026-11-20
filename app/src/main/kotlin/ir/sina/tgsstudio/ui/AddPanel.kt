@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import java.io.File
 import ir.sina.tgsstudio.editor.Creator
-import ir.sina.tgsstudio.editor.Skeleton
 import ir.sina.tgsstudio.renderer.Rgba
 
 @Composable
@@ -85,6 +84,8 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
     var bold by remember { mutableStateOf(false) }
+    var italic by remember { mutableStateOf(false) }
+    var lineSpacing by remember { mutableStateOf("1.0") }
     var color by remember { mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0)) }
     var picking by remember { mutableStateOf(false) }
     var fontSize by remember { mutableStateOf("220") }
@@ -114,11 +115,15 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
                     SmallButton(tr("Import TTF / OTF", "واردکردن فونت"), { fontPicker.launch(arrayOf("*/*")) })
                     Text(fontLabel, color = StudioColors.TextMuted, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f))
                 }
-                OutlinedTextField(fontSize, { fontSize = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Font size (px)", "اندازه فونت (پیکسل)")) }, modifier = Modifier.fillMaxWidth())
-                Text(tr("Text is shaped by Android, then converted to editable vector strokes because TGS does not support live text layers.", "متن با موتور حروف‌چینی اندروید شکل‌دهی و سپس به مسیر برداری قابل ویرایش تبدیل می‌شود؛ TGS لایه متن زنده ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(fontSize, { fontSize = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Font size (px)", "اندازه فونت (پیکسل)")) }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(lineSpacing, { lineSpacing = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Leading", "فاصله خطوط")) }, modifier = Modifier.weight(1f))
+                }
+                Text(tr("Text is shaped by Android and converted to filled editable vector contours. TGS does not support live text layers.", "متن با موتور حروف‌چینی اندروید شکل‌دهی و به مسیرهای برداری توپر و قابل ویرایش تبدیل می‌شود؛ TGS لایه متن زنده ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Swatch(color.toColor(), { picking = true })
                     SmallButton(tr("Bold", "ضخیم"), { bold = !bold }, primary = bold)
+                    SmallButton(tr("Italic", "مورب"), { italic = !italic }, primary = italic)
                 }
                 error?.let { Text(it, color = StudioColors.Danger, fontSize = 12.sp) }
             }
@@ -127,12 +132,13 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
             TextButton({
                 val baseTypeface = fontPath?.let { runCatching { Typeface.createFromFile(it) }.getOrNull() } ?: Typeface.DEFAULT
                 val px = fontSize.toFloatOrNull()?.coerceIn(12f, 600f) ?: 220f
-                val mask = TextRaster.mask(text, px, bold, baseTypeface)
-                val lines = mask?.let { Skeleton.centerline(it) }
-                if (mask == null || lines == null || lines.paths.isEmpty()) { error = noText }
+                val leading = lineSpacing.toFloatOrNull()?.coerceIn(0.8f, 2.5f) ?: 1f
+                val mask = TextRaster.mask(text, px, bold, baseTypeface, leading, italic)
+                val contours = mask?.let { TextRaster.outlines(it) }.orEmpty()
+                if (mask == null || contours.isEmpty()) { error = noText }
                 else {
                     val scale = minOf(380.0 / mask.width, 200.0 / mask.height).coerceAtMost(1.0)
-                    state.act { addCenterlineText(lines, scale, color, text.lineSequence().first().take(24)) }
+                    state.act { addOutlinedText(contours, scale, color, text.lineSequence().first().take(24)) }
                     state.updatePanel(PanelTab.PROPERTIES); onDismiss()
                 }
             }) { Text(tr("Add", "افزودن"), color = StudioColors.Accent) }
