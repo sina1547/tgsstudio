@@ -175,8 +175,13 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                     Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
                         .pointerInput(layers, ppf, state.tick) {
                             detectTapGestures { point ->
-                                val row = ((point.y - rulerPx) / rowPx).toInt()
-                                if (row in layers.indices) selectLayer(row)
+                                if (point.y < rulerPx) {
+                                    state.playing = false
+                                    state.seek(Math.rint(doc.inPoint + point.x / ppf))
+                                } else {
+                                    val row = ((point.y - rulerPx) / rowPx).toInt()
+                                    if (row in layers.indices) selectLayer(row)
+                                }
                             }
                         },
                 ) {
