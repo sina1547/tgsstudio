@@ -88,9 +88,11 @@ class SessionTest {
         s.endGesture()
         assertEquals(listOf(10.0), KeyframeOps.times(pos.prop))
         s.undo()
-        assertEquals(listOf(0.0, 10.0, 20.0), KeyframeOps.times(pos.prop))
+        val restored = s.animatedProps(t).first { it.key == "p" && it.depth == 0 }
+        assertEquals(listOf(0.0, 10.0, 20.0), KeyframeOps.times(restored.prop))
         s.redo()
-        assertEquals(listOf(10.0), KeyframeOps.times(pos.prop))
+        val redone = s.animatedProps(t).first { it.key == "p" && it.depth == 0 }
+        assertEquals(listOf(10.0), KeyframeOps.times(redone.prop))
     }
 
     @Test fun svgAndFreeformAndGrouping() {
