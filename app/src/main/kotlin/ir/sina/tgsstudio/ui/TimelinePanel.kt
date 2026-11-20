@@ -1,7 +1,6 @@
 package ir.sina.tgsstudio.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -32,8 +31,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.nativeKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -66,35 +63,7 @@ fun TimelinePanel(state: EditorState) {
 
     Ltr {
         Column(
-            Modifier.fillMaxWidth().focusable().onPreviewKeyEvent { event ->
-                val native = event.nativeKeyEvent
-                if (native.action != android.view.KeyEvent.ACTION_DOWN ||
-                    native.isCtrlPressed.not()) return@onPreviewKeyEvent false
-                when (native.keyCode) {
-                    android.view.KeyEvent.KEYCODE_C -> {
-                        val selected = state.selectedKey
-                        val entry = selected?.let { rows.getOrNull(it.first) }
-                        val copied = if (entry != null && selected != null) KeyframeOps.copy(entry.prop, selected.second) else null
-                        if (copied == null) false else {
-                            state.copiedKeyframe = copied
-                            state.message = if (state.isFa) "کیفریم کپی شد" else "Keyframe copied"
-                            state.changed()
-                            true
-                        }
-                    }
-                    android.view.KeyEvent.KEYCODE_V -> {
-                        val selected = state.selectedKey
-                        val entry = selected?.let { rows.getOrNull(it.first) }
-                        val copied = state.copiedKeyframe
-                        if (entry == null || copied == null) false else {
-                            state.act { pasteKeyframe(entry, copied) }
-                            state.message = if (state.isFa) "کیفریم در فریم فعلی جای‌گذاری شد" else "Keyframe pasted at playhead"
-                            true
-                        }
-                    }
-                    else -> false
-                }
-            },
+            Modifier.fillMaxWidth(),
         ) {
             // toolbar for the selected keyframe
             val sk = state.selectedKey
