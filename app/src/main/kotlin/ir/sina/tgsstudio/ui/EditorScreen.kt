@@ -79,6 +79,18 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
             Toast.makeText(context, if (ok) (if (lang == Lang.FA) "خروجی ذخیره شد" else "Exported") else (if (lang == Lang.FA) "خروجی ناموفق بود" else "Export failed"), Toast.LENGTH_SHORT).show()
         }
     }
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                val fontsDir = java.io.File(context.filesDir, "fonts").apply { mkdirs() }
+                val target = java.io.File(fontsDir, "custom-font-" + System.currentTimeMillis() + ".font")
+                context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use(input::copyTo) } ?: error("no font stream")
+                state.fontPath = target.absolutePath
+                state.message = if (lang == Lang.FA) "فونت وارد شد" else "Font imported"
+            }.onFailure { state.message = if (lang == Lang.FA) "وارد کردن فونت ناموفق بود" else "Font import failed" }
+        }
+    }
+
     val svgPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -173,7 +185,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     }
 
     if (showExport) ExportDialog(doc, { kind -> pendingKind = kind; exportLauncher.launch("${state.projectName}.${kind.ext}") }, { showExport = false })
-    if (showText) TextDialog(state) { showText = false }
+    if (showText) TextDialog(state, { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/octet-stream")) }) { showText = false }
     if (showRename) NameDialog(tr("Project name", "نام پروژه"), state.projectName, { n -> state.projectName = n; store.rename(state.projectId, n); doc.name = n; showRename = false; state.changed() }, { showRename = false })
     if (showLeave) ConfirmDialog(
         tr("Unsaved changes", "تغییرات ذخیره‌نشده"), tr("Save your changes before leaving?", "قبل از خروج تغییرات ذخیره شود؟"), tr("Save", "ذخیره"),
