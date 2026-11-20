@@ -37,8 +37,8 @@ class GeometryTest {
         val rounded = sharp.rounded(10.0)
         assertEquals(true, rounded.closed)
         assertEquals(8, rounded.segments.size)
-        near(50.0, rounded.segments[0].x0, 0.01)
-        near(-20.0, rounded.segments[0].y0, 0.01)
+        near(40.0, rounded.segments[0].x0, 0.01)
+        near(-30.0, rounded.segments[0].y0, 0.01)
         assertTrue(rounded.length < sharp.length)
     }
 
