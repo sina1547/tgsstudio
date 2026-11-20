@@ -355,7 +355,7 @@ private fun PlaybackBar(state: EditorState) {
             Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 12.sp)
             Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 9.sp)
         }
-        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0 } }, modifier = Modifier.padding(start = 3.dp))
+        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 3.dp))
     }
 }
 
