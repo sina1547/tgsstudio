@@ -62,7 +62,9 @@ fun TimelinePanel(state: EditorState) {
     val hScroll = rememberScrollState()
 
     Ltr {
-        Column(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth(),
+        ) {
             // toolbar for the selected keyframe
             val sk = state.selectedKey
             val selEntry = sk?.let { rows.getOrNull(it.first) }

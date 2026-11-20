@@ -159,6 +159,12 @@ fun LayersPanel(state: EditorState) {
                                 if (sel.any { state.session.parentOf(it) != null }) item(tr("Detach from parent", "جدا کردن از والد")) { reportParent(state, state.act { setParent(sel, null) }, expanded, null) }
                                 item(tr("Create parent (Null)", "ساخت والد (Null)")) { state.act { createNullParent(sel) } }
                             }
+                            if (row.target is LayerTarget && row.target.layer in selectedLayers && selectedLayers.size == 2) {
+                                val source = selectedLayers.first { it != row.target.layer }
+                                item(tr("Replace contents from other selected layer", "جایگزینی محتوا از لایه انتخاب‌شده دیگر")) {
+                                    handleResult(state, state.act { replaceLayerContents(row.target.layer, source) })
+                                }
+                            }
                             item(tr("Duplicate", "تکثیر")) { state.act { select(listOf(row.target)); duplicateSelection() } }
                             item(tr("Move up", "بالا بردن")) { state.act { move(row.target, -1) } }
                             item(tr("Move down", "پایین بردن")) { state.act { move(row.target, 1) } }
@@ -201,6 +207,7 @@ internal fun handleResult(state: EditorState, r: OpResult) {
             OpResult.Reason.GROUP_HAS_TRANSFORM -> if (state.isFa) "این گروه تبدیل (Transform) دارد؛ اول آن را به حالت پیش‌فرض برگردانید." else "This group has a transform. Reset it before ungrouping."
             OpResult.Reason.WOULD_NEST_INTO_SELF -> if (state.isFa) "یک گروه را نمی‌توان داخل خودش گذاشت." else "A group can't be moved into itself."
             OpResult.Reason.NOT_FOUND -> if (state.isFa) "عنصر پیدا نشد." else "Element not found."
+            OpResult.Reason.INCOMPATIBLE -> if (state.isFa) "جایگزینی فقط بین دو لایه برداری (Shape) در یک ترکیب امکان‌پذیر است." else "Replace works only between two vector shape layers in the same composition."
             else -> if (state.isFa) "این کار روی انتخاب فعلی ممکن نیست." else "That isn't possible for the current selection."
         }
         state.changed()

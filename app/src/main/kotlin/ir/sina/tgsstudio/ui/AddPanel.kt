@@ -1,5 +1,8 @@
 package ir.sina.tgsstudio.ui
 
+import android.graphics.Typeface
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
 import ir.sina.tgsstudio.editor.Creator
-import ir.sina.tgsstudio.editor.Skeleton
 import ir.sina.tgsstudio.renderer.Rgba
 
 @Composable
@@ -77,34 +81,64 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
 /** Text becomes vector strokes: the glyphs are rasterised, reduced to a centerline and added as stroked paths. */
 @Composable
 fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var text by remember { mutableStateOf("") }
     var bold by remember { mutableStateOf(false) }
+    var italic by remember { mutableStateOf(false) }
+    var lineSpacing by remember { mutableStateOf("1.0") }
     var color by remember { mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0)) }
     var picking by remember { mutableStateOf(false) }
+    var fontSize by remember { mutableStateOf("220") }
+    var fontPath by remember { mutableStateOf<String?>(null) }
+    var fontLabel by remember { mutableStateOf("System default") }
     var error by remember { mutableStateOf<String?>(null) }
-    val noText = tr("Couldn't turn this text into strokes.", "نتوانستم این متن را به خط تبدیل کنم.")
+    val noText = tr("Couldn't turn this text into vectors.", "نتوانستم متن را به مسیر برداری تبدیل کنم.")
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val dir = File(context.filesDir, "fonts").apply { mkdirs() }
+            val ext = uri.lastPathSegment?.substringAfterLast('.', "ttf")?.lowercase()?.takeIf { it in setOf("ttf", "otf") } ?: "ttf"
+            val file = File(dir, "font_${System.currentTimeMillis()}.$ext")
+            context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { output -> input.copyTo(output) } } ?: throw IllegalStateException("Cannot read font")
+            Typeface.createFromFile(file)
+            fontPath = file.absolutePath
+            fontLabel = uri.lastPathSegment?.substringAfterLast('/') ?: file.name
+            error = null
+        }.onFailure { error = (if (state.isFa) "فونت بارگذاری نشد: " else "Font import failed: ") + (it.message ?: "") }
+    }
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { Text(tr("Add text", "افزودن متن"), color = StudioColors.TextPrimary) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(text, { text = it; error = null }, singleLine = true, label = { Text(tr("Text", "متن")) })
-                Text(tr("Added as a single hand-drawn style stroke (centerline of the letters), not a filled outline. TGS stickers can't contain live text.", "به‌صورت یک خط دست‌نویس (خط مرکزی حروف) اضافه می‌شود، نه تو‌پر. استیکر TGS متن زنده ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(text, { text = it; error = null }, minLines = 2, maxLines = 4, label = { Text(tr("Text", "متن")) }, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton(tr("Import TTF / OTF", "واردکردن فونت"), { fontPicker.launch(arrayOf("*/*")) })
+                    Text(fontLabel, color = StudioColors.TextMuted, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(fontSize, { fontSize = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Font size (px)", "اندازه فونت (پیکسل)")) }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(lineSpacing, { lineSpacing = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Leading", "فاصله خطوط")) }, modifier = Modifier.weight(1f))
+                }
+                Text(tr("Text is shaped by Android and converted to filled editable vector contours. TGS does not support live text layers.", "متن با موتور حروف‌چینی اندروید شکل‌دهی و به مسیرهای برداری توپر و قابل ویرایش تبدیل می‌شود؛ TGS لایه متن زنده ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Swatch(color.toColor(), { picking = true })
                     SmallButton(tr("Bold", "ضخیم"), { bold = !bold }, primary = bold)
+                    SmallButton(tr("Italic", "مورب"), { italic = !italic }, primary = italic)
                 }
                 error?.let { Text(it, color = StudioColors.Danger, fontSize = 12.sp) }
             }
         },
         confirmButton = {
             TextButton({
-                val mask = TextRaster.mask(text, 220f, bold)
-                val lines = mask?.let { Skeleton.centerline(it) }
-                if (mask == null || lines == null || lines.paths.isEmpty()) { error = noText }
+                val baseTypeface = fontPath?.let { runCatching { Typeface.createFromFile(it) }.getOrNull() } ?: Typeface.DEFAULT
+                val px = fontSize.toFloatOrNull()?.coerceIn(12f, 600f) ?: 220f
+                val leading = lineSpacing.toFloatOrNull()?.coerceIn(0.8f, 2.5f) ?: 1f
+                val mask = TextRaster.mask(text, px, bold, baseTypeface, leading, italic)
+                val contours = mask?.let { TextRaster.outlines(it) }.orEmpty()
+                if (mask == null || contours.isEmpty()) { error = noText }
                 else {
                     val scale = minOf(380.0 / mask.width, 200.0 / mask.height).coerceAtMost(1.0)
-                    state.act { addCenterlineText(lines, scale, color, text.take(24)) }
+                    state.act { addOutlinedText(contours, scale, color, text.lineSequence().first().take(24)) }
                     state.updatePanel(PanelTab.PROPERTIES); onDismiss()
                 }
             }) { Text(tr("Add", "افزودن"), color = StudioColors.Accent) }

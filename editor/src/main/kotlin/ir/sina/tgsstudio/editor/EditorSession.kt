@@ -139,6 +139,13 @@ class EditorSession(val doc: LottieDocument) {
         select(emptyList()); return true
     }
 
+    /** Replaces only the vector artwork of [target] with [source]; target transform and animation stay intact. */
+    fun replaceLayerContents(target: LayerRef, source: LayerRef): OpResult {
+        val result = edit("Replace layer contents") { LayerOps.replaceContents(index, target, source) }
+        if (result is OpResult.Ok) select(listOf(LayerTarget(target)))
+        return result
+    }
+
     fun duplicateSelection() {
         val t = selection.singleOrNull() ?: return
         var next: Target? = null
@@ -277,6 +284,29 @@ class EditorSession(val doc: LottieDocument) {
         val w = doc.width / 2.0; val h = doc.height / 2.0
         addLayer("SVG", w, h, null, *r.groups.toTypedArray())
         return r
+    }
+
+    /** Adds imported/system font glyphs as filled, editable vector contours. */
+    fun addOutlinedText(contours: List<Bezier>, scale: Double, color: Rgba, name: String = "Text"): LayerTarget? {
+        if (contours.isEmpty()) return null
+        var minX = Double.MAX_VALUE; var minY = Double.MAX_VALUE
+        var maxX = -Double.MAX_VALUE; var maxY = -Double.MAX_VALUE
+        contours.forEach { path ->
+            for (i in 0 until path.count) {
+                minX = minOf(minX, path.v[i * 2]); maxX = maxOf(maxX, path.v[i * 2])
+                minY = minOf(minY, path.v[i * 2 + 1]); maxY = maxOf(maxY, path.v[i * 2 + 1])
+            }
+        }
+        val cx = (minX + maxX) / 2.0
+        val cy = (minY + maxY) / 2.0
+        val items = contours.mapIndexed { index, path ->
+            val vertices = DoubleArray(path.v.size) { i ->
+                (path.v[i] - if (i % 2 == 0) cx else cy) * scale
+            }
+            Creator.pathItem(Bezier(true, vertices, DoubleArray(vertices.size), DoubleArray(vertices.size)), "Glyph contour ${index + 1}")
+        } + Creator.fill(color)
+        val group = Creator.group(name, *items.toTypedArray())
+        return addLayer(name, doc.width / 2.0, doc.height / 2.0, color, group)
     }
 
     /** Adds text as hand-drawn centerline strokes ([lines] extracted from a rendered mask by [Skeleton]). */
