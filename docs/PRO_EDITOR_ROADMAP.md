@@ -25,12 +25,14 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 ### M1 — Animation workspace and timeline (active)
 - [x] Composition-level timeline clip bars and layer selection.
 - [x] Per-layer In/Out, Start Time and Stretch controls with undo support.
-- [ ] Drag-editable clip edges and multi-layer property expansion.
+- [x] Drag-editable layer clip In/Out edges with a single undoable trim gesture.
+- [ ] Multi-layer property expansion.
 - [ ] Expand/collapse transform and shape-property tracks per layer.
-- [ ] Multi-keyframe selection, range selection, nudge, duplicate and batch delete.
+- [x] Multi-keyframe toggle selection and batch delete across property rows, grouped as one undo step.
+- [ ] Range selection, nudge and duplicate keyframes.
 - [ ] Snap-to-frame, playhead/keyframe navigation, work-area loop and markers.
 - [ ] Graph Editor with value curves, channel selection and tangent modes.
-- [ ] Undo-safe drag gestures and timeline performance tests.
+- [ ] Timeline performance tests and broader drag-gesture regression coverage.
 
 ### M2 — Layer and composition system
 - [ ] Full Pre-compose workflow with editable nested compositions.
@@ -72,7 +74,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
-The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates, plus basic Add-mode mask creation from a top-level path with inversion/removal. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), draggable layer In/Out clip edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates, plus basic Add-mode mask creation from a top-level path with inversion/removal. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 
