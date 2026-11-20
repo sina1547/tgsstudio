@@ -76,6 +76,46 @@ class Cubic(
 class Contour(val segments: List<Cubic>, val closed: Boolean) {
     val length: Double by lazy { segments.sumOf { it.length } }
     fun transformed(m: Affine) = Contour(segments.map { it.transformed(m) }, closed)
+
+    /** Applies an editable Lottie Round Corners modifier without flattening the original curves. */
+    fun rounded(radius: Double): Contour {
+        val r = radius.coerceAtLeast(0.0)
+        val n = segments.size
+        if (r <= 0.0 || n < 2) return this
+        val cornerCount = if (closed) n else n - 1
+        val trims = DoubleArray(n)
+        for (vertex in 0 until cornerCount) {
+            val prev = segments[vertex]
+            val next = segments[(vertex + 1) % n]
+            trims[vertex] = min(r, min(prev.length * 0.49, next.length * 0.49))
+        }
+        val out = ArrayList<Cubic>(n * 2)
+        if (!closed) out += segments.first()
+        val firstVertex = if (closed) 0 else 1
+        for (vertex in firstVertex until n) {
+            val prevIndex = (vertex - 1 + n) % n
+            val prev = segments[prevIndex]
+            val next = segments[vertex]
+            val d = trims[prevIndex]
+            val e = trims[vertex]
+            val before = prev.slice(0.0, (prev.length - d).coerceAtLeast(0.0))
+            val after = next.slice(e, next.length)
+            val vx = prev.x3
+            val vy = prev.y3
+            val x0 = before.x3; val y0 = before.y3
+            val x3 = after.x0; val y3 = after.y0
+            out += Cubic(
+                x0, y0,
+                x0 + (vx - x0) * (2.0 / 3.0), y0 + (vy - y0) * (2.0 / 3.0),
+                x3 + (vx - x3) * (2.0 / 3.0), y3 + (vy - y3) * (2.0 / 3.0),
+                x3, y3,
+            )
+            val endTrim = if (closed || vertex < n - 1) trims[vertex] else 0.0
+            out += next.slice(e, (next.length - endTrim).coerceAtLeast(e))
+        }
+        if (closed) return Contour(out, true)
+        return Contour(out, false)
+    }
 }
 
 /** Raw Lottie path: vertices plus relative in/out tangents. */
