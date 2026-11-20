@@ -308,8 +308,9 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                     if (hitRow >= 0) {
                         val hit = hitRow to hitKey
                         if (state.multiKeyframeMode) {
-                            state.selectedKeys = if (hit in state.selectedKeys) state.selectedKeys - hit else state.selectedKeys + hit
-                            state.selectedKey = hit
+                            val nextSelection = if (hit in state.selectedKeys) state.selectedKeys - hit else state.selectedKeys + hit
+                            state.selectedKeys = nextSelection
+                            state.selectedKey = if (hit in nextSelection) hit else nextSelection.lastOrNull()
                         } else {
                             state.selectedKey = hit
                             state.selectedKeys = setOf(hit)
