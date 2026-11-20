@@ -67,6 +67,7 @@ fun GalleryScreen(
     store: ProjectStore, refresh: Int, setting: String,
     onOpen: (ProjectInfo) -> Unit, onNew: (String) -> Unit, onImport: () -> Unit,
     onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onLanguage: (String) -> Unit,
+    themeSetting: String, accent: String, onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit,
 ) {
     val projects = remember(refresh) { store.list() }
     var showNew by remember { mutableStateOf(false) }
@@ -126,6 +127,6 @@ fun GalleryScreen(
     if (showNew) NameDialog(tr("New project", "پروژهٔ جدید"), tr("Untitled", "بدون‌نام"), { n -> showNew = false; onNew(n) }, { showNew = false })
     renaming?.let { p -> NameDialog(tr("Rename", "تغییر نام"), p.name, { n -> onRename(p, n); renaming = null }, { renaming = null }) }
     deleting?.let { p -> ConfirmDialog(tr("Delete project?", "پروژه حذف شود؟"), tr("“${p.name}” will be removed from this phone.", "«${p.name}» از این گوشی پاک می‌شود."), tr("Delete", "حذف"), { onDelete(p); deleting = null }, { deleting = null }) }
-    if (showSettings) SettingsDialog(setting, onLanguage) { showSettings = false }
+    if (showSettings) SettingsDialog(setting, onLanguage, themeSetting, onThemeChange, accent, onAccentChange) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
 }
