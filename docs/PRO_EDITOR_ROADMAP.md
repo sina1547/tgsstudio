@@ -40,7 +40,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 ### M3 — Shape and typography
 - [ ] Full Bezier pen workflow: handles, tangent conversion, path join/split and path boolean operations.
 - [ ] Shape repeater, merge paths, rounded corners and gradient fill/stroke editing.
-- [ ] Linear/radial gradient editor with multi-stop colors, alpha stops and animated properties.
+- [ ] Extend the initial two-stop linear/radial gradient editor to arbitrary multi-stop colors, alpha stops and animated gradient properties.
 - [ ] Font library, family/style selection, tracking, baseline, paragraph alignment and per-project font references.
 - [ ] Live text model for editable project text; vector outlines remain the reliable TGS export fallback.
 - [ ] Eyedropper sampling from the rendered composition.
@@ -68,7 +68,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
-The current branch adds timeline frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area and frame-rate controls. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+The current branch adds timeline frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area and frame-rate controls. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 
