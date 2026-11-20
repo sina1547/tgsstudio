@@ -491,6 +491,10 @@ class EditorSession(val doc: LottieDocument) {
 
     fun addKeyframe(p: PropEntry, scope: String? = null) = edit("Add keyframe") { KeyframeOps.addAt(p.prop, Spaces.localFrame(index, scope, frame), p.kind == PropKind.PATH) }
     fun removeKeyframe(p: PropEntry, i: Int) = edit("Delete keyframe") { KeyframeOps.remove(p.prop, i) }
+    /** Deletes a set of keyframes from one property; callers can wrap multiple rows in one gesture. */
+    fun removeKeyframes(p: PropEntry, indices: List<Int>) = edit("Delete keyframes") {
+        indices.distinct().sortedDescending().forEach { i -> KeyframeOps.remove(p.prop, i) }
+    }
     fun moveKeyframe(p: PropEntry, i: Int, toFrame: Double) = edit("Move keyframe") { KeyframeOps.move(p.prop, i, toFrame.coerceIn(doc.inPoint, doc.outPoint)) }
     fun setKeyframeValue(p: PropEntry, i: Int, v: DoubleArray) = edit("Keyframe value") { KeyframeOps.setValues(p.prop, i, v) }
     fun setInterpolation(p: PropEntry, i: Int, m: Interp) = edit("Interpolation") { KeyframeOps.setInterpolation(p.prop, i, m) }
