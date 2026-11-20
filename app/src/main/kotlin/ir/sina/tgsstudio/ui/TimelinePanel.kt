@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -190,7 +191,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
             Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                 Canvas(
                     Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
-                        .pointerInput(layers, ppf, state.tick) {
+                        .pointerInput(ppf) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 if (down.position.y < rulerPx) {
@@ -205,8 +206,8 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                     }
                                 } else {
                                     val row = ((down.position.y - rulerPx) / rowPx).toInt()
-                                    if (row in layers.indices) {
-                                        val layer = layers[row]
+                                    if (row in state.session.doc.layers.indices) {
+                                        val layer = state.session.doc.layers[row]
                                         val ref = LayerRef(null, row)
                                         val timing = state.session.layerTiming(ref)
                                         val xIn = ((layer.inPoint - doc.inPoint) * ppf).toFloat()
@@ -291,19 +292,23 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
     val heightDp = 28.dp + ROW_H * rows.size
     val frame = state.frame
     val tick = state.tick
+    val latestRows by rememberUpdatedState(rows)
+    val latestScope by rememberUpdatedState(scope)
 
     Canvas(
         Modifier.width(widthDp).height(heightDp).background(StudioColors.Panel)
-            .pointerInput(rows, ppf, tick) {
+            .pointerInput(ppf) {
                 awaitEachGesture {
+                    val activeRows = latestRows
+                    val activeScope = latestScope
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val localOf = { f: Double -> Spaces.localFrame(state.session.index, scope, f) }
+                    val localOf = { f: Double -> Spaces.localFrame(state.session.index, activeScope, f) }
                     fun frameAt(x: Float) = ip + x / ppf
                     // which keyframe (if any) is under the finger?
                     var hitRow = -1; var hitKey = -1
                     val r = ((down.position.y - rulerPx) / rowPx).toInt()
-                    if (down.position.y > rulerPx && r in rows.indices) {
-                        KeyframeOps.times(rows[r].prop).forEachIndexed { i, t -> if (abs((t - ip) * ppf - down.position.x) <= 18f * density) { hitRow = r; hitKey = i } }
+                    if (down.position.y > rulerPx && r in activeRows.indices) {
+                        KeyframeOps.times(activeRows[r].prop).forEachIndexed { i, t -> if (abs((t - ip) * ppf - down.position.x) <= 18f * density) { hitRow = r; hitKey = i } }
                     }
                     if (hitRow >= 0) {
                         val hit = hitRow to hitKey
@@ -323,10 +328,10 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                             val ev = awaitPointerEvent(); val ch = ev.changes.first()
                             if (ch.changedToUp()) { ch.consume(); break }
                             val f = Math.rint(frameAt(ch.position.x))
-                            val t0 = KeyframeOps.times(rows[hitRow].prop).getOrNull(curIndex) ?: break
+                            val t0 = KeyframeOps.times(activeRows[hitRow].prop).getOrNull(curIndex) ?: break
                             if (abs(f - t0) >= 1.0 && abs(ch.position.x - down.position.x) > 6f * density || moved) {
                                 moved = true
-                                val ni = KeyframeOps.move(rows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
+                                val ni = KeyframeOps.move(activeRows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
                                 curIndex = ni
                                 state.selectedKey = hitRow to ni
                                 state.selectedKeys = setOf(hitRow to ni)
