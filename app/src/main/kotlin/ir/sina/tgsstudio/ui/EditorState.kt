@@ -74,7 +74,8 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var penPath by mutableStateOf<Bezier?>(null)
     var dragRect by mutableStateOf<Pair<Offset, Offset>?>(null)
 
-    var fontPath by mutableStateOf<String?>(null)
+    var fontPath by mutableStateOf(prefs.importedFontPath)
+    fun setFontPath(path: String) { fontPath = path; prefs.importedFontPath = path }
 
     // freehand pen: settings, the stroke being drawn (document coordinates), and where the next write-on stroke starts
     var penColor by mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0))
