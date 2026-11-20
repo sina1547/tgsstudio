@@ -209,13 +209,16 @@ object StyleOps {
 
     fun gradient(idx: DocIndex, t: Target, frame: Double): GradientValues? {
         val item = firstOf(idx, t, ShapeKind.GRADIENT_FILL) ?: return null
-        val values = PropEval.values(item.obj("g")?.obj("k"), frame) ?: return null
+        val g = item.obj("g") ?: return null
+        val count = g.int("p") ?: return null
+        val values = PropEval.values(g.obj("k"), frame) ?: return null
         val start = PropEval.values(item.obj("s"), frame) ?: return null
         val end = PropEval.values(item.obj("e"), frame) ?: return null
-        if (values.size < 8 || start.size < 2 || end.size < 2) return null
+        if (count < 2 || values.size < count * 4 || start.size < 2 || end.size < 2) return null
+        val last = (count - 1) * 4
         return GradientValues(
             (item.int("t") ?: 1) == 2, start[0], start[1], end[0], end[1],
-            Rgba(values[1], values[2], values[3], 1.0), Rgba(values[5], values[6], values[7], 1.0),
+            Rgba(values[1], values[2], values[3], 1.0), Rgba(values[last + 1], values[last + 2], values[last + 3], 1.0),
         )
     }
 
@@ -225,6 +228,8 @@ object StyleOps {
     fun setGradient(item: JsonObj, frame: Double, value: GradientValues) {
         val g = item.obj("g") ?: return
         val stops = g.obj("k") ?: return
+        // The current inspector edits endpoint colors; normalize to two stops rather than leave a stale stop count.
+        g.putInt("p", 2)
         PropWrite.setValues(stops, frame, doubleArrayOf(
             0.0, value.startColor.r, value.startColor.g, value.startColor.b,
             1.0, value.endColor.r, value.endColor.g, value.endColor.b,
