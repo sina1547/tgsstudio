@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.editor.Easing
 import ir.sina.tgsstudio.editor.LayerTarget
+import ir.sina.tgsstudio.editor.LayerTiming
 import ir.sina.tgsstudio.editor.Interp
 import ir.sina.tgsstudio.editor.KeyframeOps
 import ir.sina.tgsstudio.editor.PropEntry
@@ -174,13 +175,57 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                 Canvas(
                     Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
                         .pointerInput(layers, ppf, state.tick) {
-                            detectTapGestures { point ->
-                                if (point.y < rulerPx) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                if (down.position.y < rulerPx) {
                                     state.playing = false
-                                    state.seek(Math.rint(doc.inPoint + point.x / ppf))
+                                    state.seek(Math.rint(doc.inPoint + down.position.x / ppf))
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val change = event.changes.first()
+                                        if (change.changedToUp()) { change.consume(); break }
+                                        state.seek(Math.rint(doc.inPoint + change.position.x / ppf))
+                                        change.consume()
+                                    }
                                 } else {
-                                    val row = ((point.y - rulerPx) / rowPx).toInt()
-                                    if (row in layers.indices) selectLayer(row)
+                                    val row = ((down.position.y - rulerPx) / rowPx).toInt()
+                                    if (row in layers.indices) {
+                                        val layer = layers[row]
+                                        val ref = LayerRef(null, row)
+                                        val timing = state.session.layerTiming(ref)
+                                        val xIn = ((layer.inPoint - doc.inPoint) * ppf).toFloat()
+                                        val xOut = ((layer.outPoint - doc.inPoint) * ppf).toFloat()
+                                        val edgeTolerance = 16f * density
+                                        val editIn = timing != null && kotlin.math.abs(down.position.x - xIn) <= edgeTolerance
+                                        val editOut = timing != null && !editIn && kotlin.math.abs(down.position.x - xOut) <= edgeTolerance
+                                        if (editIn || editOut) {
+                                            state.session.beginGesture(if (editIn) "Trim layer in point" else "Trim layer out point")
+                                            var changed = false
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.first()
+                                                if (change.changedToUp()) { change.consume(); break }
+                                                val deltaFrames = (change.position.x - down.position.x) / ppf
+                                                val next = if (editIn) {
+                                                    timing!!.copy(inPoint = (timing.inPoint + deltaFrames).coerceIn(doc.inPoint, timing.outPoint - 1.0))
+                                                } else {
+                                                    timing!!.copy(outPoint = (timing.outPoint + deltaFrames).coerceIn(timing.inPoint + 1.0, doc.outPoint))
+                                                }
+                                                if (next != timing) {
+                                                    state.session.setLayerTiming(ref, next)
+                                                    state.changed()
+                                                    changed = true
+                                                }
+                                                change.consume()
+                                            }
+                                            state.session.endGesture()
+                                            if (changed) state.changed()
+                                        } else {
+                                            selectLayer(row)
+                                            val first = awaitPointerEvent()
+                                            first.changes.first().consume()
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -207,6 +252,8 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                 Size(x1 - x0, rowPx - 12f * density),
                                 androidx.compose.ui.geometry.CornerRadius(5f * density),
                             )
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(x0 + 2f * density, top + 9f * density), Offset(x0 + 2f * density, top + rowPx - 9f * density), 2f * density)
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(x1 - 2f * density, top + 9f * density), Offset(x1 - 2f * density, top + rowPx - 9f * density), 2f * density)
                         }
                     }
                     val px = ((state.frame - doc.inPoint) * ppf).toFloat()
