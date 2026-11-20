@@ -85,7 +85,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 val fontsDir = java.io.File(context.filesDir, "fonts").apply { mkdirs() }
                 val target = java.io.File(fontsDir, "custom-font-" + System.currentTimeMillis() + ".font")
                 context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use(input::copyTo) } ?: error("no font stream")
-                state.setFontPath(target.absolutePath)
+                state.persistImportedFontPath(target.absolutePath)
                 state.message = if (lang == Lang.FA) "فونت وارد شد" else "Font imported"
             }.onFailure { state.message = if (lang == Lang.FA) "وارد کردن فونت ناموفق بود" else "Font import failed" }
         }
