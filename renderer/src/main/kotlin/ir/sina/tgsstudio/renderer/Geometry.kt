@@ -97,8 +97,9 @@ class Contour(val segments: List<Cubic>, val closed: Boolean) {
             val prev = segments[prevIndex]
             val next = segments[vertex]
             val d = trims[prevIndex]
-            val e = trims[vertex]
-            val before = prev.slice(0.0, (prev.length - d).coerceAtLeast(0.0))
+            val e = d
+            val startTrim = if (closed || prevIndex > 0) trims[(prevIndex - 1 + n) % n] else 0.0
+            val before = prev.slice(startTrim, (prev.length - d).coerceAtLeast(startTrim))
             val after = next.slice(e, next.length)
             val vx = prev.x3
             val vy = prev.y3
