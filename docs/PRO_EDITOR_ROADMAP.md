@@ -23,7 +23,9 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 ## Development milestones
 
 ### M1 — Animation workspace and timeline (active)
-- [ ] Multi-layer timeline with clip bars, layer selection and per-layer in/out editing.
+- [x] Composition-level timeline clip bars and layer selection.
+- [x] Per-layer In/Out, Start Time and Stretch controls with undo support.
+- [ ] Drag-editable clip edges and multi-layer property expansion.
 - [ ] Expand/collapse transform and shape-property tracks per layer.
 - [ ] Multi-keyframe selection, range selection, nudge, duplicate and batch delete.
 - [ ] Snap-to-frame, playhead/keyframe navigation, work-area loop and markers.
@@ -68,7 +70,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
-The current branch adds timeline frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area and frame-rate controls. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 
