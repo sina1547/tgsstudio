@@ -14,10 +14,10 @@ import java.nio.ByteBuffer
  * then reduces the ink to a single hand-drawn style centerline.
  */
 object TextRaster {
-    fun mask(text: String, sizePx: Float = 220f, bold: Boolean = false): Mask? {
+    fun mask(text: String, sizePx: Float = 220f, bold: Boolean = false, fontPath: String? = null): Mask? {
         if (text.isBlank()) return null
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = sizePx; color = 0xFF000000.toInt(); typeface = Typeface.create(Typeface.DEFAULT, if (bold) Typeface.BOLD else Typeface.NORMAL)
+            textSize = sizePx; color = 0xFF000000.toInt(); typeface = Typeface.create(fontPath?.let { runCatching { Typeface.createFromFile(it) }.getOrNull() } ?: Typeface.DEFAULT, if (bold) Typeface.BOLD else Typeface.NORMAL)
         }
         val b = Rect(); paint.getTextBounds(text, 0, text.length, b)
         val pad = 10
