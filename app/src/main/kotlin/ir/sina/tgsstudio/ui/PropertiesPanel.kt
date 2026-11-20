@@ -64,7 +64,10 @@ fun PropertiesPanel(state: EditorState) {
             return@Column
         }
         key(tick) { TransformSection(state, target) }
-        if (target is LayerTarget) key(tick) { LayerTimingSection(state, target) }
+        if (target is LayerTarget) {
+            key(tick) { LayerTimingSection(state, target) }
+            key(tick) { MaskSection(state, target) }
+        }
         key(tick) { AppearanceSection(state, target) }
         key(tick) { ShapeSection(state, target) }
         key(tick) { TrimSection(state, target) }
@@ -72,6 +75,29 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { AnimationSection(state, target) }
         key(tick) { EffectsSection(state, target) }
         key(tick) { AdvancedSection(state, target) }
+    }
+}
+
+@Composable
+private fun MaskSection(state: EditorState, target: LayerTarget) {
+    val masks = state.session.maskInversions(target.layer)
+    Section(tr("Masks", "ماسک‌ها"), defaultOpen = false) {
+        if (masks.isEmpty()) {
+            Text(tr("No masks in this layer.", "این لایه ماسکی ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
+        } else {
+            masks.forEachIndexed { index, inverted ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${tr("Mask", "ماسک")} ${index + 1}", color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(tr("Invert", "معکوس"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    Switch(
+                        checked = inverted,
+                        onCheckedChange = { state.act { setMaskInverted(target.layer, index, it) } },
+                        colors = SwitchDefaults.colors(checkedThumbColor = StudioColors.Accent),
+                    )
+                    IconBtn(Ic.Trash, { state.act { removeMask(target.layer, index) } }, size = 34.dp, iconSize = 17.dp)
+                }
+            }
+        }
     }
 }
 
