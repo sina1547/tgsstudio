@@ -1,6 +1,8 @@
 package ir.sina.tgsstudio.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -36,7 +38,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.editor.Easing
+import ir.sina.tgsstudio.editor.LayerTarget
 import ir.sina.tgsstudio.editor.Interp
 import ir.sina.tgsstudio.editor.KeyframeOps
 import ir.sina.tgsstudio.editor.PropEntry
@@ -107,6 +111,8 @@ fun TimelinePanel(state: EditorState) {
                 }, modifier = Modifier.width(88.dp), decimals = 1, label = "FPS")
                 Text(tr("Work area", "محدودهٔ کار"), color = StudioColors.TextMuted, fontSize = 11.sp)
             }
+            LayerTracks(state, contentWidthDp)
+
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
 
             if (target == null || rows.isEmpty()) {
@@ -122,6 +128,77 @@ fun TimelinePanel(state: EditorState) {
                 }
                 Box(Modifier.weight(1f).horizontalScroll(hScroll)) {
                     TimelineCanvas(state, rows, scope, contentWidthDp)
+                }
+            }
+        }
+    }
+}
+
+/** Composition-level layer tracks. Selecting a clip focuses that layer's animatable property tracks below. */
+@Composable
+private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp) {
+    val layers = state.session.doc.layers
+    val doc = state.session.doc
+    val density = LocalDensity.current.density
+    val ppf = state.timelinePxPerFrame
+    val rulerPx = 24f * density
+    val rowPx = 32f * density
+    val scroll = rememberScrollState()
+
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text(tr("Composition layers", "لایه‌های کامپوزیشن"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
+        Row(Modifier.fillMaxWidth().height((24 + 32 * layers.size).dp)) {
+            Column(Modifier.width(LABEL_W)) {
+                Box(Modifier.height(24.dp))
+                layers.forEachIndexed { index, layer ->
+                    val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
+                    Text(
+                        layer.name.ifBlank { "Layer ${index + 1}" },
+                        color = if (selected) StudioColors.Accent else StudioColors.TextPrimary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().height(32.dp).clickable {
+                            state.act { select(listOf(LayerTarget(LayerRef(null, index)))) }
+                        }.padding(start = 8.dp, top = 8.dp),
+                    )
+                }
+            }
+            Box(Modifier.weight(1f).horizontalScroll(scroll)) {
+                Canvas(
+                    Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
+                        .pointerInput(layers, ppf, state.tick) {
+                            detectTapGestures { point ->
+                                val row = ((point.y - rulerPx) / rowPx).toInt()
+                                if (row in layers.indices) state.act { select(listOf(LayerTarget(LayerRef(null, row)))) }
+                            }
+                        },
+                ) {
+                    val step = niceStep(ppf, density)
+                    var f = Math.ceil(doc.inPoint / step) * step
+                    while (f <= doc.outPoint) {
+                        val x = ((f - doc.inPoint) * ppf).toFloat()
+                        drawLine(StudioColors.Divider, Offset(x, 0f), Offset(x, size.height), 1f)
+                        f += step
+                    }
+                    layers.forEachIndexed { index, layer ->
+                        val top = rulerPx + index * rowPx
+                        drawLine(StudioColors.Divider, Offset(0f, top + rowPx), Offset(size.width, top + rowPx), 1f)
+                        val start = (layer.inPoint - doc.inPoint).coerceAtLeast(0.0)
+                        val end = (layer.outPoint - doc.inPoint).coerceAtMost(doc.outPoint - doc.inPoint)
+                        val x0 = (start * ppf).toFloat()
+                        val x1 = (end * ppf).toFloat()
+                        if (x1 > x0) {
+                            val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
+                            drawRoundRect(
+                                if (selected) StudioColors.Accent.copy(alpha = 0.72f) else StudioColors.PanelHigh,
+                                Offset(x0, top + 6f * density),
+                                Size(x1 - x0, rowPx - 12f * density),
+                                androidx.compose.ui.geometry.CornerRadius(5f * density),
+                            )
+                        }
+                    }
+                    val px = ((state.frame - doc.inPoint) * ppf).toFloat()
+                    drawLine(StudioColors.Warning, Offset(px, 0f), Offset(px, size.height), 1.5f * density)
                 }
             }
         }
