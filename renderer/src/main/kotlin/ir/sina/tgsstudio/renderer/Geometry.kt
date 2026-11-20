@@ -90,7 +90,7 @@ class Contour(val segments: List<Cubic>, val closed: Boolean) {
             trims[vertex] = min(r, min(prev.length * 0.49, next.length * 0.49))
         }
         val out = ArrayList<Cubic>(n * 2)
-        if (!closed) out += segments.first()
+        if (!closed) out += segments.first().slice(0.0, (segments.first().length - trims[0]).coerceAtLeast(0.0))
         val firstVertex = if (closed) 0 else 1
         for (vertex in firstVertex until n) {
             val prevIndex = (vertex - 1 + n) % n
