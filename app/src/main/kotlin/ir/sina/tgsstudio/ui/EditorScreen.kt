@@ -81,13 +81,20 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     }
     val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
+            var target: java.io.File? = null
             runCatching {
                 val fontsDir = java.io.File(context.filesDir, "fonts").apply { mkdirs() }
-                val target = java.io.File(fontsDir, "custom-font-" + System.currentTimeMillis() + ".font")
-                context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use(input::copyTo) } ?: error("no font stream")
-                state.persistImportedFontPath(target.absolutePath)
-                state.message = if (lang == Lang.FA) "فونت وارد شد" else "Font imported"
-            }.onFailure { state.message = if (lang == Lang.FA) "وارد کردن فونت ناموفق بود" else "Font import failed" }
+                val pickedName = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':').orEmpty()
+                val ext = pickedName.substringAfterLast('.', "ttf").lowercase().takeIf { it == "ttf" || it == "otf" } ?: "ttf"
+                target = java.io.File(fontsDir, "custom-font-" + System.currentTimeMillis() + "." + ext)
+                context.contentResolver.openInputStream(uri)?.use { input -> target!!.outputStream().use(input::copyTo) } ?: error("no font stream")
+                android.graphics.Typeface.createFromFile(target!!)
+                state.persistImportedFontPath(target!!.absolutePath)
+                state.message = if (lang == Lang.FA) "فونت وارد شد و ذخیره شد" else "Font imported and saved"
+            }.onFailure {
+                target?.delete()
+                state.message = (if (lang == Lang.FA) "وارد کردن فونت ناموفق بود: " else "Font import failed: ") + (it.message ?: "")
+            }
         }
     }
 
