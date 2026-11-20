@@ -76,7 +76,7 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
 
 /** Text becomes vector strokes: the glyphs are rasterised, reduced to a centerline and added as stroked paths. */
 @Composable
-fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
+fun TextDialog(state: EditorState, onImportFont: () -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var bold by remember { mutableStateOf(false) }
     var color by remember { mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0)) }
@@ -93,13 +93,15 @@ fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Swatch(color.toColor(), { picking = true })
                     SmallButton(tr("Bold", "ضخیم"), { bold = !bold }, primary = bold)
+                    SmallButton(tr("Import font", "وارد کردن فونت"), onImportFont)
                 }
+                Text(state.fontPath?.substringAfterLast('/') ?: tr("System font", "فونت سیستم"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 error?.let { Text(it, color = StudioColors.Danger, fontSize = 12.sp) }
             }
         },
         confirmButton = {
             TextButton({
-                val mask = TextRaster.mask(text, 220f, bold)
+                val mask = TextRaster.mask(text, 220f, bold, state.fontPath)
                 val lines = mask?.let { Skeleton.centerline(it) }
                 if (mask == null || lines == null || lines.paths.isEmpty()) { error = noText }
                 else {
