@@ -29,6 +29,10 @@ class AppPrefs(context: Context) {
         get() = sp.getString("themeAccent", "1E7BFF") ?: "1E7BFF"
         set(v) { sp.edit().putString("themeAccent", v.filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }.take(6)).apply() }
 
+    var importedFontPath: String?
+        get() = sp.getString("fontPath", null)
+        set(v) { sp.edit().putString("fontPath", v).apply() }
+
     var openPanel: String
         get() = sp.getString("panel", "layers") ?: "layers"
         set(v) { sp.edit().putString("panel", v).apply() }
