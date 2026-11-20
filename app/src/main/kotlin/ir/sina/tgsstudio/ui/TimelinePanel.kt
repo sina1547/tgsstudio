@@ -91,6 +91,22 @@ fun TimelinePanel(state: EditorState) {
                 }, enabled = activeRow != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
                 IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 17.dp)
                 IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 17.dp)
+                SmallButton(if (state.multiKeyframeMode) "Multi ✓" else "Multi", {
+                    state.multiKeyframeMode = !state.multiKeyframeMode
+                    if (!state.multiKeyframeMode) state.selectedKeys = state.selectedKey?.let { setOf(it) } ?: emptySet()
+                    state.changed()
+                }, primary = state.multiKeyframeMode)
+                IconBtn(Ic.Trash, {
+                    val grouped = state.selectedKeys.groupBy({ it.first }, { it.second })
+                    if (grouped.isNotEmpty()) {
+                        state.session.beginGesture("Delete selected keyframes")
+                        grouped.forEach { (row, indices) -> rows.getOrNull(row)?.let { state.session.removeKeyframes(it, indices) } }
+                        state.session.endGesture()
+                        state.selectedKeys = emptySet()
+                        state.selectedKey = null
+                        state.changed()
+                    }
+                }, enabled = state.selectedKeys.isNotEmpty(), size = 34.dp, iconSize = 17.dp, tint = StudioColors.Danger)
             }
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
@@ -290,7 +306,15 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                         KeyframeOps.times(rows[r].prop).forEachIndexed { i, t -> if (abs((t - ip) * ppf - down.position.x) <= 18f * density) { hitRow = r; hitKey = i } }
                     }
                     if (hitRow >= 0) {
-                        state.selectedKey = hitRow to hitKey; state.changed()
+                        val hit = hitRow to hitKey
+                        if (state.multiKeyframeMode) {
+                            state.selectedKeys = if (hit in state.selectedKeys) state.selectedKeys - hit else state.selectedKeys + hit
+                            state.selectedKey = hit
+                        } else {
+                            state.selectedKey = hit
+                            state.selectedKeys = setOf(hit)
+                        }
+                        state.changed()
                         state.session.beginGesture("Move keyframe")
                         var moved = false
                         var curIndex = hitKey
@@ -302,7 +326,10 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                             if (abs(f - t0) >= 1.0 && abs(ch.position.x - down.position.x) > 6f * density || moved) {
                                 moved = true
                                 val ni = KeyframeOps.move(rows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
-                                curIndex = ni; state.selectedKey = hitRow to ni; state.changed()
+                                curIndex = ni
+                                state.selectedKey = hitRow to ni
+                                state.selectedKeys = setOf(hitRow to ni)
+                                state.changed()
                             }
                             ch.consume()
                         }
@@ -337,7 +364,7 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
             val kfs = KeyframeOps.times(r.prop)
             if (kfs.size >= 2) drawRoundBar(Offset(((kfs.first() - ip) * ppf).toFloat(), top + rowPx * 0.28f), Offset(((kfs.last() - ip) * ppf).toFloat(), top + rowPx * 0.72f), barColor(r.key))
             kfs.forEachIndexed { k, t ->
-                val sel = state.selectedKey == (i to k)
+                val sel = state.selectedKey == (i to k) || (i to k) in state.selectedKeys
                 drawDiamond(Offset(((t - ip) * ppf).toFloat(), top + rowPx / 2), (if (sel) 9f else 7f) * density, if (sel) Color.White else Color(0xFFDCE6FF), sel)
             }
         }
