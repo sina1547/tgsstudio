@@ -15,6 +15,10 @@ class GradientFillTest {
         assertTrue(session.addGradientFill(target))
         val initial = assertNotNull(session.gradientOf(target))
         assertEquals(false, initial.radial)
+        val animatedTracks = session.animatedProps(target).map { it.key }
+        assertTrue("gradient" in animatedTracks)
+        assertTrue("start" in animatedTracks)
+        assertTrue("end" in animatedTracks)
 
         session.setGradient(target, initial.copy(
             radial = true,
