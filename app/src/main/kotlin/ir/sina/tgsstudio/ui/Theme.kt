@@ -4,9 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
 private data class StudioPalette(
@@ -31,7 +28,7 @@ object StudioColors {
     private val dark = palette(0xFF0A1222,0xFF111B30,0xFF18253F,0xFF21314F,0xFF1E7BFF,0xFF123B7A,0xFF7C4DDB,0xFF33A36B,0xFFE8EEFA,0xFF8795B4,0xFF243452,0xFFFF6B7A,0xFFFFB84D,0xFF2A3550,0xFF212B42)
     private val light = palette(0xFFF3F5FA,0xFFFFFFFF,0xFFE8EDF6,0xFFDCE4F0,0xFF1769E0,0xFFDCEAFF,0xFF7046C8,0xFF168653,0xFF182338,0xFF64738B,0xFFD5DDE9,0xFFD83D55,0xFFAA6900,0xFFE1E6EF,0xFFF0F3F8)
     private val neon = palette(0xFF080812,0xFF111122,0xFF1B1B35,0xFF29294A,0xFF00E5FF,0xFF123C4A,0xFFD84DFF,0xFF00D68F,0xFFF1F0FF,0xFF9A9AB8,0xFF343451,0xFFFF5577,0xFFFFC857,0xFF292943,0xFF1C1C32)
-    private var active by mutableStateOf(dark)
+    private var active = dark
 
     fun configure(theme: String, accentHex: String) {
         val base = when (theme) { "light" -> light; "neon" -> neon; "custom" -> dark; else -> dark }
