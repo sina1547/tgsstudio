@@ -63,9 +63,14 @@ class EditorState(val projectId: String, var projectName: String, val session: E
         viewFitted = true
     }
     fun zoomPan(centroid: Offset, zoom: Float, pan: Offset) {
+        // Keep the document canvas centered in the workspace; pinch changes scale only.
         val ns = (viewScale * zoom).coerceIn(0.1f, 40f)
         val k = ns / viewScale
-        viewOffset = Offset(centroid.x - (centroid.x - viewOffset.x) * k + pan.x, centroid.y - (centroid.y - viewOffset.y) * k + pan.y)
+        val center = Offset(fitSize.x / 2f, fitSize.y / 2f)
+        viewOffset = Offset(
+            center.x - (center.x - viewOffset.x) * k,
+            center.y - (center.y - viewOffset.y) * k,
+        )
         viewScale = ns
     }
     var fitSize by mutableStateOf(Offset.Zero)
