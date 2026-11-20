@@ -227,6 +227,9 @@ private fun KeyframeBar(state: EditorState, entry: PropEntry, index: Int) {
                 NumberField(e.ix, { state.act { setEasing(entry, index, e.copy(ix = it)) } }, Modifier.weight(1f), decimals = 2, label = "x2")
                 NumberField(e.iy, { state.act { setEasing(entry, index, e.copy(iy = it)) } }, Modifier.weight(1f), decimals = 2, label = "y2")
             }
+            var showGraph by remember(entry.prop, index) { mutableStateOf(false) }
+            SmallButton(tr("Open visual graph editor", "باز کردن ویرایشگر گرافیکی"), { showGraph = true }, modifier = Modifier.padding(top = 6.dp), ic = Ic.Effects)
+            if (showGraph) GraphEditorDialog(e, { next -> state.act { setEasing(entry, index, next) } }) { showGraph = false }
         }
         if (entry.kind != ir.sina.tgsstudio.editor.PropKind.PATH) {
             val vals = (KeyframeOps.list(entry.prop).getOrNull(index)?.get("s") as? ir.sina.tgsstudio.document.json.JsonArr)?.items?.mapNotNull { (it as? ir.sina.tgsstudio.document.json.JsonNum)?.value?.toDouble() }?.toDoubleArray()
