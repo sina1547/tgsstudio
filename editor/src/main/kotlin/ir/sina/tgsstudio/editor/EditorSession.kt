@@ -19,6 +19,8 @@ import ir.sina.tgsstudio.renderer.SceneBuilder
 /** Timing of a write-on (Trim Paths) animation, in document frames. */
 data class WriteOn(val startFrame: Double, val frames: Double, val easing: Easing = Easing.EASE_IN_OUT)
 
+data class LayerTiming(val inPoint: Double, val outPoint: Double, val startTime: Double, val stretch: Double)
+
 class EditorSession(val doc: LottieDocument) {
     val history = History(doc.root)
     val index: DocIndex get() = DocIndex(doc)
@@ -141,6 +143,21 @@ class EditorSession(val doc: LottieDocument) {
 
     fun rename(t: Target, name: String) = edit("Rename") { when (t) { is LayerTarget -> LayerOps.rename(index, t.layer, name); is ShapeTarget -> ShapeOps.rename(index, t.ref, name) } }
     fun setHidden(t: Target, hidden: Boolean) = edit("Visibility") { when (t) { is LayerTarget -> LayerOps.setHidden(index, t.layer, hidden); is ShapeTarget -> ShapeOps.setHidden(index, t.ref, hidden) } }
+
+    fun layerTiming(ref: LayerRef): LayerTiming? {
+        val raw = index.layerRaw(ref) ?: return null
+        return LayerTiming(raw.double("ip") ?: doc.inPoint, raw.double("op") ?: doc.outPoint, raw.double("st") ?: 0.0, (raw.double("sr") ?: 1.0).coerceAtLeast(0.01))
+    }
+
+    fun setLayerTiming(ref: LayerRef, value: LayerTiming) = edit("Layer timing") {
+        val raw = index.layerRaw(ref) ?: return@edit
+        val start = value.inPoint.coerceAtLeast(0.0)
+        val end = value.outPoint.coerceAtLeast(start + 1.0)
+        raw.putDouble("ip", start)
+        raw.putDouble("op", end)
+        raw.putDouble("st", value.startTime)
+        raw.putDouble("sr", value.stretch.coerceIn(0.01, 100.0))
+    }
 
     fun deleteSelection(): Boolean {
         if (selection.isEmpty()) return false
