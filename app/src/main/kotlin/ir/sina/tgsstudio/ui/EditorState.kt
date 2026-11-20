@@ -94,7 +94,9 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var nodeIndex by mutableIntStateOf(-1)
 
     // timeline
-    var selectedKey by mutableStateOf<Pair<Int, Int>?>(null)   // (row, keyframe index)
+    var selectedKey by mutableStateOf<Pair<Int, Int>?>(null)   // focused (row, keyframe index)
+    var selectedKeys by mutableStateOf<Set<Pair<Int, Int>>>(emptySet())
+    var multiKeyframeMode by mutableStateOf(false)
     var copiedKeyframe by mutableStateOf<JsonObj?>(null)
     var timelinePxPerFrame by mutableFloatStateOf(6f)
 
