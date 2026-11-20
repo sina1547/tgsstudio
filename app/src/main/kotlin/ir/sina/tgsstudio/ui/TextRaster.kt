@@ -25,12 +25,14 @@ object TextRaster {
         bold: Boolean = false,
         typeface: Typeface = Typeface.DEFAULT,
         lineSpacingMultiplier: Float = 1f,
+        italic: Boolean = false,
     ): Mask? {
         if (text.isBlank()) return null
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = sizePx.coerceIn(12f, 600f)
             color = android.graphics.Color.BLACK
-            this.typeface = Typeface.create(typeface, if (bold) Typeface.BOLD else Typeface.NORMAL)
+            val style = (if (bold) Typeface.BOLD else Typeface.NORMAL) or (if (italic) Typeface.ITALIC else 0)
+            this.typeface = Typeface.create(typeface, style)
         }
         val measuredWidth = text.split('\n').maxOfOrNull { paint.measureText(it) } ?: 0f
         val pad = 12
