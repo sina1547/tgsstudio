@@ -425,7 +425,16 @@ class EditorSession(val doc: LottieDocument) {
     fun pasteKeyframe(p: PropEntry, kf: ir.sina.tgsstudio.document.json.JsonObj) = edit("Paste keyframe") { KeyframeOps.paste(p.prop, kf, frame) }
     fun valueAt(p: PropEntry): DoubleArray? = PropEval.values(p.prop, frame)
 
-    fun setFrameRate(fps: Double) = edit("Frame rate") { doc.frameRate = fps }
+    fun setFrameRate(fps: Double) = edit("Frame rate") { doc.frameRate = fps.coerceIn(1.0, 120.0) }
+
+    /** Changes the composition work area without deleting keyframes outside the new range. */
+    fun setWorkArea(startFrame: Double, endFrame: Double) = edit("Work area") {
+        val start = startFrame.coerceAtLeast(0.0)
+        val end = endFrame.coerceAtLeast(start + 1.0)
+        doc.inPoint = start
+        doc.outPoint = end
+        frame = frame.coerceIn(start, end - 1.0)
+    }
 }
 
 private typealias JsonObjOrNull = ir.sina.tgsstudio.document.json.JsonObj?
