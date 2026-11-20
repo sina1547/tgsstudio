@@ -87,6 +87,26 @@ fun TimelinePanel(state: EditorState) {
                 IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 17.dp)
                 IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 17.dp)
             }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                NumberField(doc.inPoint, {
+                    val end = doc.outPoint
+                    state.act { setWorkArea(it, end) }
+                    state.seek(state.frame)
+                }, modifier = Modifier.width(88.dp), decimals = 0, label = "In")
+                NumberField(doc.outPoint, {
+                    val start = doc.inPoint
+                    state.act { setWorkArea(start, it) }
+                    state.seek(state.frame)
+                }, modifier = Modifier.width(88.dp), decimals = 0, label = "Out")
+                NumberField(doc.frameRate, {
+                    state.act { setFrameRate(it) }
+                }, modifier = Modifier.width(88.dp), decimals = 1, label = "FPS")
+                Text(tr("Work area", "محدودهٔ کار"), color = StudioColors.TextMuted, fontSize = 11.sp)
+            }
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
 
             if (target == null || rows.isEmpty()) {
