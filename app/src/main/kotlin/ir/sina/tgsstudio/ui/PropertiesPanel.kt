@@ -88,7 +88,7 @@ private fun MaskSection(state: EditorState, target: LayerTarget) {
             tr("Create from selected path", "ساخت از مسیر انتخاب‌شده"),
             {
                 val ok = selectedPath?.let { state.act { addMaskFromPath(target.layer, it.ref) } } ?: false
-                state.message = if (ok) tr("Mask created", "ماسک ساخته شد") else tr("Select a top-level path in this layer", "یک مسیر مستقیم از همین لایه انتخاب کنید")
+                state.message = if (ok) (if (state.isFa) "ماسک ساخته شد" else "Mask created") else (if (state.isFa) "یک مسیر مستقیم از همین لایه انتخاب کنید" else "Select a top-level path in this layer")
             },
             enabled = selectedPath != null,
             ic = Ic.Add,
