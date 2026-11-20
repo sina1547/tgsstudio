@@ -85,30 +85,49 @@ fun GalleryScreen(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Logo(46.dp)
-                    Column(Modifier.weight(1f)) {
-                        Text("SINA TGS Studio", color = StudioColors.TextPrimary, fontSize = 22.sp)
-                        Text(tr("Telegram sticker motion editor", "ویرایشگر انیمیشن استیکر تلگرام"), color = StudioColors.TextMuted, fontSize = 13.sp)
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                        .background(Brush.linearGradient(listOf(StudioColors.PanelRaised, StudioColors.Panel, StudioColors.AccentSoft)))
+                        .padding(16.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Logo(52.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("SINA TGS STUDIO", color = StudioColors.TextPrimary, fontSize = 19.sp)
+                                Text(tr("VECTOR  ·  MOTION  ·  TGS", "وکتور  ·  موشن  ·  TGS"), color = StudioColors.Accent, fontSize = 10.sp)
+                            }
+                            IconBtn(Ic.Settings, { showSettings = true }, size = 38.dp)
+                            IconBtn(Ic.Info, { showAbout = true }, size = 38.dp)
+                        }
+                        Text(
+                            tr("A creative workspace for Telegram motion graphics", "فضای حرفه‌ای طراحی و ساخت موشن‌گرافیک تلگرام"),
+                            color = StudioColors.TextMuted, fontSize = 12.sp,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SmallButton(tr("New Project", "پروژهٔ جدید"), { showNew = true }, Modifier.weight(1f).height(44.dp), primary = true, ic = Ic.Plus)
+                            SmallButton(tr("Import TGS", "ورود فایل TGS"), onImport, Modifier.weight(1f).height(44.dp), ic = Ic.Folder)
+                        }
                     }
-                    IconBtn(Ic.Settings, { showSettings = true })
-                    IconBtn(Ic.Info, { showAbout = true })
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SmallButton(tr("New Project", "پروژهٔ جدید"), { showNew = true }, Modifier.weight(1f), primary = true, ic = Ic.Plus)
-                    SmallButton(tr("Open TGS", "باز کردن TGS"), onImport, Modifier.weight(1f), ic = Ic.Folder)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(tr("Your workspace", "فضای کاری شما"), color = StudioColors.TextPrimary, fontSize = 17.sp)
+                        Text(tr("Recent projects", "پروژه‌های اخیر"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    }
+                    Text("${projects.size}  ${tr("PROJECTS", "پروژه")}", color = StudioColors.Accent, fontSize = 10.sp)
                 }
-                Text(tr("Recent Projects", "پروژه‌های اخیر"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
-                if (projects.isEmpty()) Text(tr("No projects yet. Create one or open a .tgs file.", "هنوز پروژه‌ای نیست. یکی بسازید یا یک فایل .tgs باز کنید."), color = StudioColors.TextMuted, fontSize = 13.sp)
+                if (projects.isEmpty()) Text(tr("No projects yet. Create one or import a .tgs file to get started.", "هنوز پروژه‌ای نیست. برای شروع پروژه بسازید یا فایل TGS وارد کنید."), color = StudioColors.TextMuted, fontSize = 13.sp)
             }
         }
         items(projects, key = { it.id }) { p ->
             val thumb = remember(p.id, p.modified) { store.thumbnail(p.id)?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
             Column(
-                Modifier.clip(RoundedCornerShape(16.dp)).background(StudioColors.Panel).combinedClickable(onClick = { onOpen(p) }, onLongClick = { menuFor = p.id }),
+                Modifier.clip(RoundedCornerShape(18.dp)).background(StudioColors.Panel)
+                    .combinedClickable(onClick = { onOpen(p) }, onLongClick = { menuFor = p.id }),
             ) {
-                Box(Modifier.fillMaxWidth().aspectRatio(1f).background(StudioColors.CheckerA), contentAlignment = Alignment.Center) {
-                    if (thumb != null) Image(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) else Icon(Ic.Shape, StudioColors.TextMuted, 36.dp)
+                Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Brush.linearGradient(listOf(StudioColors.CheckerA, StudioColors.CheckerB))), contentAlignment = Alignment.Center) {
+                    if (thumb != null) Image(thumb, null, Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit) else Icon(Ic.Shape, StudioColors.TextMuted, 36.dp)
                     Box(Modifier.align(Alignment.TopEnd)) {
                         DropdownMenu(menuFor == p.id, { menuFor = null }, containerColor = StudioColors.PanelRaised) {
                             DropdownMenuItem(text = { Text(tr("Rename", "تغییر نام"), color = StudioColors.TextPrimary) }, onClick = { menuFor = null; renaming = p })
