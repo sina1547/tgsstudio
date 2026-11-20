@@ -78,6 +78,21 @@ class SessionTest {
         assertTrue(s.animatedProps(t).any { it.key == "c" && it.kind == PropKind.COLOR })
     }
 
+    @Test fun batchKeyframeDeletionIsUndoableAndKeepsRemainingFrames() {
+        val s = session(); val t = s.addStar(256.0, 256.0, 60.0)!!
+        val pos = s.animatedProps(t).first { it.key == "p" && it.depth == 0 }
+        listOf(0.0, 10.0, 20.0).forEach { frame -> s.frame = frame; s.addKeyframe(pos) }
+        assertEquals(listOf(0.0, 10.0, 20.0), KeyframeOps.times(pos.prop))
+        s.beginGesture("Batch delete")
+        s.removeKeyframes(pos, listOf(0, 2))
+        s.endGesture()
+        assertEquals(listOf(10.0), KeyframeOps.times(pos.prop))
+        s.undo()
+        assertEquals(listOf(0.0, 10.0, 20.0), KeyframeOps.times(pos.prop))
+        s.redo()
+        assertEquals(listOf(10.0), KeyframeOps.times(pos.prop))
+    }
+
     @Test fun svgAndFreeformAndGrouping() {
         val s = session()
         val r = s.addSvg("""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="red"/><circle cx="5" cy="5" r="3" fill="blue"/></svg>""")!!
