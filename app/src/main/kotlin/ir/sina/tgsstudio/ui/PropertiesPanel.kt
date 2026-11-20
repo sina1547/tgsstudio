@@ -41,6 +41,7 @@ import ir.sina.tgsstudio.renderer.Rgba
 fun propLabel(key: String): String = when (key) {
     "a" -> tr("Anchor", "نقطهٔ لنگر"); "p", "position" -> tr("Position", "موقعیت"); "s" -> tr("Scale", "مقیاس"); "r" -> tr("Rotation", "چرخش")
     "o" -> tr("Opacity", "شفافیت"); "c" -> tr("Color", "رنگ"); "w" -> tr("Stroke width", "ضخامت خط"); "path" -> tr("Path", "مسیر")
+    "gradient" -> tr("Gradient stops", "ایستگاه‌های گرادیان"); "start" -> tr("Gradient start", "شروع گرادیان"); "end" -> tr("Gradient end", "پایان گرادیان")
     "size" -> tr("Size", "اندازه"); "roundness" -> tr("Roundness", "گردی گوشه"); "points" -> tr("Points", "تعداد نقاط")
     "outer" -> tr("Outer radius", "شعاع بیرونی"); "inner" -> tr("Inner radius", "شعاع درونی")
     "start" -> tr("Trim start %", "شروع برش ٪"); "end" -> tr("Trim end %", "پایان برش ٪"); "offset" -> tr("Trim offset °", "جابه‌جایی برش °")
