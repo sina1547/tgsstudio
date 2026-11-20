@@ -26,7 +26,7 @@ import ir.sina.tgsstudio.ui.Lang
 import ir.sina.tgsstudio.ui.WithLanguage
 
 @Composable
-fun StudioApp() {
+fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit) {
     val context = LocalContext.current
     val prefs = remember { AppPrefs(context) }
     val store = remember { ProjectStore(context) }
@@ -69,6 +69,8 @@ fun StudioApp() {
                 onRename = { p, n -> store.rename(p.id, n); refresh++ },
                 onDelete = { p -> store.delete(p.id); refresh++ },
                 onLanguage = { s -> prefs.languageSetting = s; setting = s },
+                themeSetting = prefs.themeSetting, accent = prefs.themeAccent,
+                onThemeChange = onThemeChange, onAccentChange = onAccentChange,
             )
         } else {
             EditorScreen(ed, store, lang) { editor = null; refresh++ }
