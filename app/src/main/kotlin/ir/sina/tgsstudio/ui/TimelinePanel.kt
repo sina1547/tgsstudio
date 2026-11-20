@@ -32,9 +32,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -69,9 +67,11 @@ fun TimelinePanel(state: EditorState) {
     Ltr {
         Column(
             Modifier.fillMaxWidth().focusable().onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.C -> {
+                val native = event.nativeKeyEvent
+                if (native.action != android.view.KeyEvent.ACTION_DOWN ||
+                    native.isCtrlPressed.not()) return@onPreviewKeyEvent false
+                when (native.keyCode) {
+                    android.view.KeyEvent.KEYCODE_C -> {
                         val selected = state.selectedKey
                         val entry = selected?.let { rows.getOrNull(it.first) }
                         val copied = if (entry != null && selected != null) KeyframeOps.copy(entry.prop, selected.second) else null
@@ -82,7 +82,7 @@ fun TimelinePanel(state: EditorState) {
                             true
                         }
                     }
-                    Key.V -> {
+                    android.view.KeyEvent.KEYCODE_V -> {
                         val selected = state.selectedKey
                         val entry = selected?.let { rows.getOrNull(it.first) }
                         val copied = state.copiedKeyframe
