@@ -101,6 +101,21 @@ class EditorSession(val doc: LottieDocument) {
     fun fillColor(t: Target) = StyleOps.fillColor(index, t, lf(t))
     fun strokeColor(t: Target) = StyleOps.strokeColor(index, t, lf(t))
     fun strokeWidth(t: Target) = StyleOps.strokeWidth(index, t, lf(t))
+    fun gradientOf(t: Target): GradientValues? = StyleOps.gradient(index, t, lf(t))
+
+    fun addGradientFill(t: Target): Boolean {
+        var added = false
+        edit("Add gradient fill") { group(t)?.let { added = StyleOps.ensureGradient(it) != null } }
+        return added
+    }
+
+    fun setGradient(t: Target, value: GradientValues) = edit("Gradient fill") {
+        StyleOps.firstOf(index, t, ShapeKind.GRADIENT_FILL)?.let { StyleOps.setGradient(it, lf(t), value) }
+    }
+
+    fun removeGradientFill(t: Target) = edit("Remove gradient fill") {
+        group(t)?.let { StyleOps.remove(it, "gf") }
+    }
 
     private fun group(t: Target): JsonObjOrNull = when (t) {
         is ShapeTarget -> index.shapeRaw(t.ref)?.takeIf { it.string("ty") == "gr" }
