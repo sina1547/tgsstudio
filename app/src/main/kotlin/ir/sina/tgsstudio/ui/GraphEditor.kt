@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import ir.sina.tgsstudio.editor.Easing
-import kotlin.math.hypot
 
 /** Interactive cubic-Bezier graph editor. Handle coordinates are normalized to the unit square. */
 @Composable
