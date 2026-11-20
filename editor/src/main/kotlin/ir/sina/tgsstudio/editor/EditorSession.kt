@@ -4,6 +4,7 @@ import ir.sina.tgsstudio.document.DocIndex
 import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.document.LottieDocument
 import ir.sina.tgsstudio.document.ShapeKind
+import ir.sina.tgsstudio.document.json.JsonObj
 import ir.sina.tgsstudio.document.ShapeRef
 import ir.sina.tgsstudio.renderer.Bezier
 import ir.sina.tgsstudio.renderer.PropEval
@@ -157,6 +158,20 @@ class EditorSession(val doc: LottieDocument) {
         raw.putDouble("op", end)
         raw.putDouble("st", value.startTime)
         raw.putDouble("sr", value.stretch.coerceIn(0.01, 100.0))
+    }
+
+    /** Inversion flags for masks on a layer. Mask geometry stays in the original Lottie document tree. */
+    fun maskInversions(ref: LayerRef): List<Boolean> =
+        index.layerRaw(ref)?.arr("masksProperties")?.items?.filterIsInstance<JsonObj>()?.map { it.bool("inv") ?: false }.orEmpty()
+
+    fun setMaskInverted(ref: LayerRef, maskIndex: Int, inverted: Boolean) = edit("Invert mask") {
+        val mask = index.layerRaw(ref)?.arr("masksProperties")?.items?.getOrNull(maskIndex) as? JsonObj ?: return@edit
+        mask.putBool("inv", inverted)
+    }
+
+    fun removeMask(ref: LayerRef, maskIndex: Int) = edit("Remove mask") {
+        val masks = index.layerRaw(ref)?.arr("masksProperties") ?: return@edit
+        if (maskIndex in masks.items.indices) masks.items.removeAt(maskIndex)
     }
 
     fun deleteSelection(): Boolean {
