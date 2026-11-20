@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.sina.tgsstudio.editor.AnimatedProps
 import ir.sina.tgsstudio.editor.KeyframeOps
+import ir.sina.tgsstudio.editor.GradientValues
 import ir.sina.tgsstudio.editor.LayerTarget
 import ir.sina.tgsstudio.editor.PathOps
 import ir.sina.tgsstudio.editor.PropEntry
@@ -122,6 +123,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
     val v = state.session.transformOf(t) ?: return
     var picking by remember { mutableStateOf<String?>(null) }
     val fill = state.session.fillColor(t); val stroke = state.session.strokeColor(t)
+    val gradient = state.session.gradientOf(t)
     Section(tr("Appearance", "ظاهر")) {
         Labeled(tr("Opacity", "شفافیت")) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,6 +141,28 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             Swatch(stroke?.toColor(), { picking = "stroke" })
             if (stroke != null) IconBtn(Ic.Trash, { state.act { removeStroke(t) } }, size = 36.dp, iconSize = 18.dp)
         }
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(tr("Gradient", "گرادیان"), color = StudioColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            if (gradient == null) {
+                SmallButton(tr("Add", "افزودن"), { state.act { addGradientFill(t) } }, ic = Ic.Add)
+            } else {
+                Swatch(gradient.startColor.toColor(), { picking = "gradientStart" })
+                Swatch(gradient.endColor.toColor(), { picking = "gradientEnd" })
+                IconBtn(Ic.Trash, { state.act { removeGradientFill(t) } }, size = 36.dp, iconSize = 18.dp)
+            }
+        }
+        if (gradient != null) {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallButton(tr("Linear", "خطی"), { state.act { setGradient(t, gradient.copy(radial = false)) } }, primary = !gradient.radial)
+                SmallButton(tr("Radial", "شعاعی"), { state.act { setGradient(t, gradient.copy(radial = true)) } }, primary = gradient.radial)
+            }
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NumberField(gradient.startX, { state.act { setGradient(t, gradient.copy(startX = it)) } }, Modifier.weight(1f), label = "X1")
+                NumberField(gradient.startY, { state.act { setGradient(t, gradient.copy(startY = it)) } }, Modifier.weight(1f), label = "Y1")
+                NumberField(gradient.endX, { state.act { setGradient(t, gradient.copy(endX = it)) } }, Modifier.weight(1f), label = "X2")
+                NumberField(gradient.endY, { state.act { setGradient(t, gradient.copy(endY = it)) } }, Modifier.weight(1f), label = "Y2")
+            }
+        }
         state.session.strokeWidth(t)?.let { w ->
             Labeled(tr("Stroke width", "ضخامت خط")) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,10 +173,25 @@ private fun AppearanceSection(state: EditorState, t: Target) {
         }
     }
     picking?.let { which ->
-        val initial = (if (which == "fill") fill else stroke) ?: Rgba(0.12, 0.48, 1.0, 1.0)
+        val initial = when (which) {
+            "fill" -> fill
+            "stroke" -> stroke
+            "gradientStart" -> gradient?.startColor
+            "gradientEnd" -> gradient?.endColor
+            else -> null
+        } ?: Rgba(0.12, 0.48, 1.0, 1.0)
         ColorPickerDialog(
             initial,
-            onPick = { c -> if (!state.session.history.isGestureOpen) state.session.beginGesture("Color"); if (which == "fill") state.session.setFillColor(t, c) else state.session.setStrokeColor(t, c); state.changed() },
+            onPick = { c ->
+                if (!state.session.history.isGestureOpen) state.session.beginGesture("Color")
+                when (which) {
+                    "fill" -> state.session.setFillColor(t, c)
+                    "stroke" -> state.session.setStrokeColor(t, c)
+                    "gradientStart" -> gradient?.let { state.session.setGradient(t, it.copy(startColor = c)) }
+                    "gradientEnd" -> gradient?.let { state.session.setGradient(t, it.copy(endColor = c)) }
+                }
+                state.changed()
+            },
             onDone = { state.session.endGesture(); picking = null; state.changed() },
         )
     }
