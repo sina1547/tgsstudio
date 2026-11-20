@@ -275,7 +275,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
             }
 
             when (mode) {
-                Mode.PAN -> state.viewOffset = state.viewOffset + d
+                Mode.PAN -> Unit // Keep the document canvas anchored; empty-space drags do not move the canvas.
                 Mode.MOVE -> { session.dragBy((d.x / state.viewScale).toDouble(), (d.y / state.viewScale).toDouble()); state.changed() }
                 Mode.SCALE -> {
                     val dist = docDist(doc, Offset(pivotX.toFloat(), pivotY.toFloat())).coerceAtLeast(1.0)
