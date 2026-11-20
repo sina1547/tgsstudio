@@ -4,6 +4,7 @@ import ir.sina.tgsstudio.document.DocIndex
 import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.document.LottieDocument
 import ir.sina.tgsstudio.document.ShapeKind
+import ir.sina.tgsstudio.document.json.JsonArr
 import ir.sina.tgsstudio.document.json.JsonObj
 import ir.sina.tgsstudio.document.ShapeRef
 import ir.sina.tgsstudio.renderer.Bezier
@@ -158,6 +159,31 @@ class EditorSession(val doc: LottieDocument) {
         raw.putDouble("op", end)
         raw.putDouble("st", value.startTime)
         raw.putDouble("sr", value.stretch.coerceIn(0.01, 100.0))
+    }
+
+    /**
+     * Creates an Add-mode mask from a direct child path in the same shape layer.
+     * Restricting the source to a top-level path avoids silently losing nested group transforms.
+     */
+    fun addMaskFromPath(target: LayerRef, source: ShapeRef, inverted: Boolean = false): Boolean {
+        if (source.layer != target || source.path.size != 1) return false
+        val shape = index.shapeRaw(source)?.takeIf { it.string("ty") == "sh" } ?: return false
+        val path = PathEdit.read(shape, Spaces.localFrame(index, target.scope, frame)) ?: return false
+        var added = false
+        edit("Create mask") {
+            val layer = index.layerRaw(target) ?: return@edit
+            val masks = layer.arr("masksProperties") ?: JsonArr().also { layer["masksProperties"] = it }
+            val mask = obj(
+                "mode" to str("a"),
+                "pt" to staticPathProp(path),
+                "o" to staticProp(100.0),
+                "x" to staticProp(0.0),
+                "nm" to str("Mask ${masks.items.size + 1}"),
+            ).also { it.putBool("inv", inverted) }
+            masks.items.add(mask)
+            added = true
+        }
+        return added
     }
 
     /** Inversion flags for masks on a layer. Mask geometry stays in the original Lottie document tree. */
