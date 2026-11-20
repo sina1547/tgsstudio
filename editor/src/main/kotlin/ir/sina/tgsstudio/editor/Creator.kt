@@ -26,6 +26,14 @@ object Creator {
         "ty" to str("fl"), "c" to staticProp(c.r, c.g, c.b, c.a), "o" to staticProp(100.0), "r" to int(1), "nm" to str("Fill 1"),
     )
 
+    /** Creates an editable two-stop linear gradient fill in standard Lottie form. */
+    fun gradientFill(start: Rgba = Rgba(0.12, 0.48, 1.0, 1.0), end: Rgba = Rgba(0.55, 0.25, 0.95, 1.0)): JsonObj = obj(
+        "ty" to str("gf"), "nm" to str("Gradient Fill"),
+        "o" to staticProp(100.0), "r" to int(1), "bm" to int(0), "t" to int(1),
+        "g" to obj("p" to int(2), "k" to staticProp(0.0, start.r, start.g, start.b, 1.0, end.r, end.g, end.b)),
+        "s" to staticProp(-100.0, 0.0), "e" to staticProp(100.0, 0.0),
+    )
+
     fun stroke(c: Rgba, width: Double): JsonObj = obj(
         "ty" to str("st"), "c" to staticProp(c.r, c.g, c.b, c.a), "o" to staticProp(100.0), "w" to staticProp(width),
         "lc" to int(2), "lj" to int(2), "ml" to int(4), "nm" to str("Stroke 1"),
