@@ -144,6 +144,13 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
     val rulerPx = 24f * density
     val rowPx = 32f * density
     val scroll = rememberScrollState()
+    fun selectLayer(index: Int) {
+        val target = LayerTarget(LayerRef(null, index))
+        val next = if (state.multiSelect) {
+            if (target in state.session.selection) state.session.selection - target else state.session.selection + target
+        } else listOf(target)
+        state.act { select(next) }
+    }
 
     Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
         Text(tr("Composition layers", "لایه‌های کامپوزیشن"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
@@ -158,7 +165,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         fontSize = 11.sp,
                         maxLines = 1,
                         modifier = Modifier.fillMaxWidth().height(32.dp).clickable {
-                            state.act { select(listOf(LayerTarget(LayerRef(null, index)))) }
+                            selectLayer(index)
                         }.padding(start = 8.dp, top = 8.dp),
                     )
                 }
@@ -169,7 +176,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         .pointerInput(layers, ppf, state.tick) {
                             detectTapGestures { point ->
                                 val row = ((point.y - rulerPx) / rowPx).toInt()
-                                if (row in layers.indices) state.act { select(listOf(LayerTarget(LayerRef(null, row)))) }
+                                if (row in layers.indices) selectLayer(row)
                             }
                         },
                 ) {
