@@ -240,8 +240,42 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                             if (changed) state.changed()
                                         } else {
                                             selectLayer(row)
-                                            val first = awaitPointerEvent()
-                                            first.changes.first().consume()
+                                            val onClip = down.position.x >= xIn && down.position.x <= xOut
+                                            if (timing != null && onClip) {
+                                                var gestureStarted = false
+                                                var changedClip = false
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.first()
+                                                    if (change.changedToUp()) { change.consume(); break }
+                                                    val rawDelta = Math.rint((change.position.x - down.position.x) / ppf)
+                                                    if (kotlin.math.abs(change.position.x - down.position.x) > 6f * density) {
+                                                        if (!gestureStarted) {
+                                                            state.session.beginGesture("Move layer")
+                                                            gestureStarted = true
+                                                        }
+                                                        val delta = rawDelta.coerceIn(
+                                                            doc.inPoint - timing.inPoint,
+                                                            doc.outPoint - timing.outPoint,
+                                                        )
+                                                        val next = timing.copy(
+                                                            inPoint = timing.inPoint + delta,
+                                                            outPoint = timing.outPoint + delta,
+                                                        )
+                                                        if (next != timing) {
+                                                            state.session.setLayerTiming(ref, next)
+                                                            state.changed()
+                                                            changedClip = true
+                                                        }
+                                                    }
+                                                    change.consume()
+                                                }
+                                                if (gestureStarted) state.session.endGesture()
+                                                if (changedClip) state.changed()
+                                            } else {
+                                                val first = awaitPointerEvent()
+                                                first.changes.first().consume()
+                                            }
                                         }
                                     }
                                 }
