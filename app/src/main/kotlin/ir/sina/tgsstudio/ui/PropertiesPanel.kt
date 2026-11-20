@@ -81,7 +81,18 @@ fun PropertiesPanel(state: EditorState) {
 @Composable
 private fun MaskSection(state: EditorState, target: LayerTarget) {
     val masks = state.session.maskInversions(target.layer)
+    val selectedPath = state.session.selection.filterIsInstance<ShapeTarget>()
+        .firstOrNull { it.layer == target.layer && it.ref.path.size == 1 }
     Section(tr("Masks", "ماسک‌ها"), defaultOpen = false) {
+        SmallButton(
+            tr("Create from selected path", "ساخت از مسیر انتخاب‌شده"),
+            {
+                val ok = selectedPath?.let { state.act { addMaskFromPath(target.layer, it.ref) } } ?: false
+                state.message = if (ok) tr("Mask created", "ماسک ساخته شد") else tr("Select a top-level path in this layer", "یک مسیر مستقیم از همین لایه انتخاب کنید")
+            },
+            enabled = selectedPath != null,
+            ic = Ic.Add,
+        )
         if (masks.isEmpty()) {
             Text(tr("No masks in this layer.", "این لایه ماسکی ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
         } else {
