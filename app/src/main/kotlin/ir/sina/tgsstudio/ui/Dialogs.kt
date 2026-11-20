@@ -98,7 +98,7 @@ fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss:
 }
 
 @Composable
-fun SettingsDialog(current: String, onChange: (String) -> Unit, onDismiss: () -> Unit) {
+fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: String, onThemeChange: (String) -> Unit, accent: String, onAccentChange: (String) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { DialogTitle(tr("Settings", "تنظیمات")) },
@@ -111,6 +111,25 @@ fun SettingsDialog(current: String, onChange: (String) -> Unit, onDismiss: () ->
                             .clickable { onChange(code) }.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (current == code) Icon(Ic.Check, Color.White, 18.dp) }
+                }
+                Text(tr("Workspace theme", "تم محیط"), color = StudioColors.TextMuted, fontSize = 13.sp)
+                listOf("dark" to tr("Dark", "تیره"), "light" to tr("Light", "روشن"), "neon" to "Neon", "custom" to tr("Custom", "سفارشی")).forEach { (code, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (currentTheme == code) StudioColors.AccentSoft else StudioColors.PanelRaised)
+                            .clickable { onThemeChange(code) }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (currentTheme == code) Icon(Ic.Check, Color.White, 18.dp) }
+                }
+                if (currentTheme == "custom") {
+                    OutlinedTextField(
+                        value = accent,
+                        onValueChange = { value ->
+                            val clean = value.filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }.take(6)
+                            onAccentChange(clean)
+                        },
+                        label = { Text(tr("Custom accent HEX", "رنگ تأکیدی HEX")) },
+                        singleLine = true,
+                    )
                 }
             }
         },
