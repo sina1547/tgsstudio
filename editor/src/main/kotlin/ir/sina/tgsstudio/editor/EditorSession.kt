@@ -139,6 +139,13 @@ class EditorSession(val doc: LottieDocument) {
         select(emptyList()); return true
     }
 
+    /** Replaces only the vector artwork of [target] with [source]; target transform and animation stay intact. */
+    fun replaceLayerContents(target: LayerRef, source: LayerRef): OpResult {
+        val result = edit("Replace layer contents") { LayerOps.replaceContents(index, target, source) }
+        if (result is OpResult.Ok) select(listOf(LayerTarget(target)))
+        return result
+    }
+
     fun duplicateSelection() {
         val t = selection.singleOrNull() ?: return
         var next: Target? = null
