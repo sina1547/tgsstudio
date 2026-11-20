@@ -129,7 +129,7 @@ fun TimelinePanel(state: EditorState) {
                 }, modifier = Modifier.width(88.dp), decimals = 1, label = "FPS")
                 Text(tr("Work area", "محدودهٔ کار"), color = StudioColors.TextMuted, fontSize = 11.sp)
             }
-            LayerTracks(state, contentWidthDp)
+            LayerTracks(state, contentWidthDp, hScroll)
 
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
 
@@ -139,7 +139,9 @@ fun TimelinePanel(state: EditorState) {
             }
             Row(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Column(Modifier.width(LABEL_W)) {
-                    Box(Modifier.height(28.dp))
+                    Box(Modifier.height(28.dp), contentAlignment = Alignment.CenterStart) {
+                        Text(tr("Properties", "ویژگی‌ها"), color = StudioColors.TextMuted, fontSize = 10.sp, modifier = Modifier.padding(start = 8.dp))
+                    }
                     rows.forEach { r -> Row(Modifier.height(ROW_H).padding(start = (4 + r.depth * 8).dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${propLabel(r.key)}", color = StudioColors.TextPrimary, fontSize = 12.sp, maxLines = 1)
                     } }
@@ -154,14 +156,13 @@ fun TimelinePanel(state: EditorState) {
 
 /** Composition-level layer tracks. Selecting a clip focuses that layer's animatable property tracks below. */
 @Composable
-private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp) {
+private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp, scroll: androidx.compose.foundation.ScrollState) {
     val layers = state.session.doc.layers
     val doc = state.session.doc
     val density = LocalDensity.current.density
     val ppf = state.timelinePxPerFrame
     val rulerPx = 24f * density
     val rowPx = 32f * density
-    val scroll = rememberScrollState()
     fun selectLayer(index: Int) {
         val target = LayerTarget(LayerRef(null, index))
         val next = if (state.multiSelect) {
@@ -239,8 +240,42 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                             if (changed) state.changed()
                                         } else {
                                             selectLayer(row)
-                                            val first = awaitPointerEvent()
-                                            first.changes.first().consume()
+                                            val onClip = down.position.x >= xIn && down.position.x <= xOut
+                                            if (timing != null && onClip) {
+                                                var gestureStarted = false
+                                                var changedClip = false
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.first()
+                                                    if (change.changedToUp()) { change.consume(); break }
+                                                    val rawDelta = Math.rint(((change.position.x - down.position.x) / ppf).toDouble())
+                                                    if (kotlin.math.abs(change.position.x - down.position.x) > 6f * density) {
+                                                        if (!gestureStarted) {
+                                                            state.session.beginGesture("Move layer")
+                                                            gestureStarted = true
+                                                        }
+                                                        val delta = rawDelta.coerceIn(
+                                                            doc.inPoint - timing.inPoint,
+                                                            doc.outPoint - timing.outPoint,
+                                                        )
+                                                        val next = timing.copy(
+                                                            inPoint = timing.inPoint + delta,
+                                                            outPoint = timing.outPoint + delta,
+                                                        )
+                                                        if (next != timing) {
+                                                            state.session.setLayerTiming(ref, next)
+                                                            state.changed()
+                                                            changedClip = true
+                                                        }
+                                                    }
+                                                    change.consume()
+                                                }
+                                                if (gestureStarted) state.session.endGesture()
+                                                if (changedClip) state.changed()
+                                            } else {
+                                                val first = awaitPointerEvent()
+                                                first.changes.first().consume()
+                                            }
                                         }
                                     }
                                 }
@@ -252,6 +287,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                     while (f <= doc.outPoint) {
                         val x = ((f - doc.inPoint) * ppf).toFloat()
                         drawLine(StudioColors.Divider, Offset(x, 0f), Offset(x, size.height), 1f)
+                        drawContext.canvas.nativeCanvas.drawText(f.toInt().toString(), x + 3f * density, rulerPx - 6f * density, textPaint(density))
                         f += step
                     }
                     layers.forEachIndexed { index, layer ->
@@ -271,6 +307,11 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                             )
                             drawLine(Color.White.copy(alpha = 0.55f), Offset(x0 + 2f * density, top + 9f * density), Offset(x0 + 2f * density, top + rowPx - 9f * density), 2f * density)
                             drawLine(Color.White.copy(alpha = 0.55f), Offset(x1 - 2f * density, top + 9f * density), Offset(x1 - 2f * density, top + rowPx - 9f * density), 2f * density)
+                            val clipName = layer.name.ifBlank { "Layer ${index + 1}" }
+                            drawContext.canvas.nativeCanvas.save()
+                            drawContext.canvas.nativeCanvas.clipRect(x0 + 6f * density, top + 3f * density, (x1 - 6f * density).coerceAtLeast(x0 + 6f * density), top + rowPx - 3f * density)
+                            drawContext.canvas.nativeCanvas.drawText(clipName, x0 + 9f * density, top + rowPx * 0.64f, android.graphics.Paint(textPaint(density)).apply { color = android.graphics.Color.WHITE; textSize = 10f * density; typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD) })
+                            drawContext.canvas.nativeCanvas.restore()
                         }
                     }
                     val px = ((state.frame - doc.inPoint) * ppf).toFloat()
