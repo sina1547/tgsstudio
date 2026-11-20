@@ -1,6 +1,8 @@
 package ir.sina.tgsstudio.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -20,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +39,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.editor.Easing
+import ir.sina.tgsstudio.editor.LayerTarget
+import ir.sina.tgsstudio.editor.LayerTiming
 import ir.sina.tgsstudio.editor.Interp
 import ir.sina.tgsstudio.editor.KeyframeOps
 import ir.sina.tgsstudio.editor.PropEntry
@@ -69,9 +75,62 @@ fun TimelinePanel(state: EditorState) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Ic.Timeline, StudioColors.Accent, 20.dp)
                 Text(tr("Timeline", "تایم‌لاین"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 36.dp, iconSize = 18.dp)
-                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 36.dp, iconSize = 18.dp)
+                IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 34.dp, iconSize = 17.dp)
+                NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(76.dp), decimals = 0, label = "F")
+                IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
+                val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
+                IconBtn(Ic.Add, {
+                    val ri = activeRow
+                    if (ri != null) {
+                        val entry = rows[ri]
+                        state.act { addKeyframe(entry, scope) }
+                        val localFrame = Spaces.localFrame(state.session.index, scope, state.frame)
+                        val ki = KeyframeOps.times(entry.prop).indexOfFirst { abs(it - localFrame) < 0.5 }
+                        if (ki >= 0) state.selectedKey = ri to ki
+                        state.changed()
+                    }
+                }, enabled = activeRow != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
+                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 17.dp)
+                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 17.dp)
+                SmallButton(if (state.multiKeyframeMode) "Multi ✓" else "Multi", {
+                    state.multiKeyframeMode = !state.multiKeyframeMode
+                    if (!state.multiKeyframeMode) state.selectedKeys = state.selectedKey?.let { setOf(it) } ?: emptySet()
+                    state.changed()
+                }, primary = state.multiKeyframeMode)
+                IconBtn(Ic.Trash, {
+                    val grouped = state.selectedKeys.groupBy({ it.first }, { it.second })
+                    if (grouped.isNotEmpty()) {
+                        state.session.beginGesture("Delete selected keyframes")
+                        grouped.forEach { (row, indices) -> rows.getOrNull(row)?.let { state.session.removeKeyframes(it, indices) } }
+                        state.session.endGesture()
+                        state.selectedKeys = emptySet()
+                        state.selectedKey = null
+                        state.changed()
+                    }
+                }, enabled = state.selectedKeys.isNotEmpty(), size = 34.dp, iconSize = 17.dp, tint = StudioColors.Danger)
             }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                NumberField(doc.inPoint, {
+                    val end = doc.outPoint
+                    state.act { setWorkArea(it, end) }
+                    state.seek(state.frame)
+                }, modifier = Modifier.width(88.dp), decimals = 0, label = "In")
+                NumberField(doc.outPoint, {
+                    val start = doc.inPoint
+                    state.act { setWorkArea(start, it) }
+                    state.seek(state.frame)
+                }, modifier = Modifier.width(88.dp), decimals = 0, label = "Out")
+                NumberField(doc.frameRate, {
+                    state.act { setFrameRate(it) }
+                }, modifier = Modifier.width(88.dp), decimals = 1, label = "FPS")
+                Text(tr("Work area", "محدودهٔ کار"), color = StudioColors.TextMuted, fontSize = 11.sp)
+            }
+            LayerTracks(state, contentWidthDp)
+
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
 
             if (target == null || rows.isEmpty()) {
@@ -93,6 +152,135 @@ fun TimelinePanel(state: EditorState) {
     }
 }
 
+/** Composition-level layer tracks. Selecting a clip focuses that layer's animatable property tracks below. */
+@Composable
+private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp) {
+    val layers = state.session.doc.layers
+    val doc = state.session.doc
+    val density = LocalDensity.current.density
+    val ppf = state.timelinePxPerFrame
+    val rulerPx = 24f * density
+    val rowPx = 32f * density
+    val scroll = rememberScrollState()
+    fun selectLayer(index: Int) {
+        val target = LayerTarget(LayerRef(null, index))
+        val next = if (state.multiSelect) {
+            if (target in state.session.selection) state.session.selection - target else state.session.selection + target
+        } else listOf(target)
+        state.act { select(next) }
+    }
+
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text(tr("Composition layers", "لایه‌های کامپوزیشن"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
+        Row(Modifier.fillMaxWidth().height((24 + 32 * layers.size).dp)) {
+            Column(Modifier.width(LABEL_W)) {
+                Box(Modifier.height(24.dp))
+                layers.forEachIndexed { index, layer ->
+                    val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
+                    Text(
+                        layer.name.ifBlank { "Layer ${index + 1}" },
+                        color = if (selected) StudioColors.Accent else StudioColors.TextPrimary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().height(32.dp).clickable {
+                            selectLayer(index)
+                        }.padding(start = 8.dp, top = 8.dp),
+                    )
+                }
+            }
+            Box(Modifier.weight(1f).horizontalScroll(scroll)) {
+                Canvas(
+                    Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
+                        .pointerInput(ppf) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                if (down.position.y < rulerPx) {
+                                    state.playing = false
+                                    state.seek(Math.rint(doc.inPoint + down.position.x / ppf))
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val change = event.changes.first()
+                                        if (change.changedToUp()) { change.consume(); break }
+                                        state.seek(Math.rint(doc.inPoint + change.position.x / ppf))
+                                        change.consume()
+                                    }
+                                } else {
+                                    val row = ((down.position.y - rulerPx) / rowPx).toInt()
+                                    if (row in state.session.doc.layers.indices) {
+                                        val layer = state.session.doc.layers[row]
+                                        val ref = LayerRef(null, row)
+                                        val timing = state.session.layerTiming(ref)
+                                        val xIn = ((layer.inPoint - doc.inPoint) * ppf).toFloat()
+                                        val xOut = ((layer.outPoint - doc.inPoint) * ppf).toFloat()
+                                        val edgeTolerance = 16f * density
+                                        val editIn = timing != null && kotlin.math.abs(down.position.x - xIn) <= edgeTolerance
+                                        val editOut = timing != null && !editIn && kotlin.math.abs(down.position.x - xOut) <= edgeTolerance
+                                        if (editIn || editOut) {
+                                            state.session.beginGesture(if (editIn) "Trim layer in point" else "Trim layer out point")
+                                            var changed = false
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.first()
+                                                if (change.changedToUp()) { change.consume(); break }
+                                                val deltaFrames = (change.position.x - down.position.x) / ppf
+                                                val next = if (editIn) {
+                                                    timing!!.copy(inPoint = (timing.inPoint + deltaFrames).coerceIn(doc.inPoint, timing.outPoint - 1.0))
+                                                } else {
+                                                    timing!!.copy(outPoint = (timing.outPoint + deltaFrames).coerceIn(timing.inPoint + 1.0, doc.outPoint))
+                                                }
+                                                if (next != timing) {
+                                                    state.session.setLayerTiming(ref, next)
+                                                    state.changed()
+                                                    changed = true
+                                                }
+                                                change.consume()
+                                            }
+                                            state.session.endGesture()
+                                            if (changed) state.changed()
+                                        } else {
+                                            selectLayer(row)
+                                            val first = awaitPointerEvent()
+                                            first.changes.first().consume()
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    val step = niceStep(ppf, density)
+                    var f = Math.ceil(doc.inPoint / step) * step
+                    while (f <= doc.outPoint) {
+                        val x = ((f - doc.inPoint) * ppf).toFloat()
+                        drawLine(StudioColors.Divider, Offset(x, 0f), Offset(x, size.height), 1f)
+                        f += step
+                    }
+                    layers.forEachIndexed { index, layer ->
+                        val top = rulerPx + index * rowPx
+                        drawLine(StudioColors.Divider, Offset(0f, top + rowPx), Offset(size.width, top + rowPx), 1f)
+                        val start = (layer.inPoint - doc.inPoint).coerceAtLeast(0.0)
+                        val end = (layer.outPoint - doc.inPoint).coerceAtMost(doc.outPoint - doc.inPoint)
+                        val x0 = (start * ppf).toFloat()
+                        val x1 = (end * ppf).toFloat()
+                        if (x1 > x0) {
+                            val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
+                            drawRoundRect(
+                                if (selected) StudioColors.Accent.copy(alpha = 0.72f) else StudioColors.PanelHigh,
+                                Offset(x0, top + 6f * density),
+                                Size(x1 - x0, rowPx - 12f * density),
+                                androidx.compose.ui.geometry.CornerRadius(5f * density),
+                            )
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(x0 + 2f * density, top + 9f * density), Offset(x0 + 2f * density, top + rowPx - 9f * density), 2f * density)
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(x1 - 2f * density, top + 9f * density), Offset(x1 - 2f * density, top + rowPx - 9f * density), 2f * density)
+                        }
+                    }
+                    val px = ((state.frame - doc.inPoint) * ppf).toFloat()
+                    drawLine(StudioColors.Warning, Offset(px, 0f), Offset(px, size.height), 1.5f * density)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: String?, widthDp: androidx.compose.ui.unit.Dp) {
     val density = LocalDensity.current.density
@@ -104,22 +292,35 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
     val heightDp = 28.dp + ROW_H * rows.size
     val frame = state.frame
     val tick = state.tick
+    val latestRows by rememberUpdatedState(rows)
+    val latestScope by rememberUpdatedState(scope)
 
     Canvas(
         Modifier.width(widthDp).height(heightDp).background(StudioColors.Panel)
-            .pointerInput(rows, ppf, tick) {
+            .pointerInput(ppf) {
                 awaitEachGesture {
+                    val activeRows = latestRows
+                    val activeScope = latestScope
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val localOf = { f: Double -> Spaces.localFrame(state.session.index, scope, f) }
+                    val localOf = { f: Double -> Spaces.localFrame(state.session.index, activeScope, f) }
                     fun frameAt(x: Float) = ip + x / ppf
                     // which keyframe (if any) is under the finger?
                     var hitRow = -1; var hitKey = -1
                     val r = ((down.position.y - rulerPx) / rowPx).toInt()
-                    if (down.position.y > rulerPx && r in rows.indices) {
-                        KeyframeOps.times(rows[r].prop).forEachIndexed { i, t -> if (abs((t - ip) * ppf - down.position.x) <= 18f * density) { hitRow = r; hitKey = i } }
+                    if (down.position.y > rulerPx && r in activeRows.indices) {
+                        KeyframeOps.times(activeRows[r].prop).forEachIndexed { i, t -> if (abs((t - ip) * ppf - down.position.x) <= 18f * density) { hitRow = r; hitKey = i } }
                     }
                     if (hitRow >= 0) {
-                        state.selectedKey = hitRow to hitKey; state.changed()
+                        val hit = hitRow to hitKey
+                        if (state.multiKeyframeMode) {
+                            val nextSelection = if (hit in state.selectedKeys) state.selectedKeys - hit else state.selectedKeys + hit
+                            state.selectedKeys = nextSelection
+                            state.selectedKey = if (hit in nextSelection) hit else nextSelection.lastOrNull()
+                        } else {
+                            state.selectedKey = hit
+                            state.selectedKeys = setOf(hit)
+                        }
+                        state.changed()
                         state.session.beginGesture("Move keyframe")
                         var moved = false
                         var curIndex = hitKey
@@ -127,11 +328,14 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                             val ev = awaitPointerEvent(); val ch = ev.changes.first()
                             if (ch.changedToUp()) { ch.consume(); break }
                             val f = Math.rint(frameAt(ch.position.x))
-                            val t0 = KeyframeOps.times(rows[hitRow].prop).getOrNull(curIndex) ?: break
+                            val t0 = KeyframeOps.times(activeRows[hitRow].prop).getOrNull(curIndex) ?: break
                             if (abs(f - t0) >= 1.0 && abs(ch.position.x - down.position.x) > 6f * density || moved) {
                                 moved = true
-                                val ni = KeyframeOps.move(rows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
-                                curIndex = ni; state.selectedKey = hitRow to ni; state.changed()
+                                val ni = KeyframeOps.move(activeRows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
+                                curIndex = ni
+                                state.selectedKey = hitRow to ni
+                                state.selectedKeys = setOf(hitRow to ni)
+                                state.changed()
                             }
                             ch.consume()
                         }
@@ -166,7 +370,7 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
             val kfs = KeyframeOps.times(r.prop)
             if (kfs.size >= 2) drawRoundBar(Offset(((kfs.first() - ip) * ppf).toFloat(), top + rowPx * 0.28f), Offset(((kfs.last() - ip) * ppf).toFloat(), top + rowPx * 0.72f), barColor(r.key))
             kfs.forEachIndexed { k, t ->
-                val sel = state.selectedKey == (i to k)
+                val sel = state.selectedKey == (i to k) || (i to k) in state.selectedKeys
                 drawDiamond(Offset(((t - ip) * ppf).toFloat(), top + rowPx / 2), (if (sel) 9f else 7f) * density, if (sel) Color.White else Color(0xFFDCE6FF), sel)
             }
         }

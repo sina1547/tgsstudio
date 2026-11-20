@@ -4,6 +4,8 @@ import ir.sina.tgsstudio.document.DocIndex
 import ir.sina.tgsstudio.document.LayerRef
 import ir.sina.tgsstudio.document.LottieDocument
 import ir.sina.tgsstudio.document.ShapeKind
+import ir.sina.tgsstudio.document.json.JsonArr
+import ir.sina.tgsstudio.document.json.JsonObj
 import ir.sina.tgsstudio.document.ShapeRef
 import ir.sina.tgsstudio.renderer.Bezier
 import ir.sina.tgsstudio.renderer.PropEval
@@ -18,6 +20,8 @@ import ir.sina.tgsstudio.renderer.SceneBuilder
  */
 /** Timing of a write-on (Trim Paths) animation, in document frames. */
 data class WriteOn(val startFrame: Double, val frames: Double, val easing: Easing = Easing.EASE_IN_OUT)
+
+data class LayerTiming(val inPoint: Double, val outPoint: Double, val startTime: Double, val stretch: Double)
 
 class EditorSession(val doc: LottieDocument) {
     val history = History(doc.root)
@@ -101,6 +105,21 @@ class EditorSession(val doc: LottieDocument) {
     fun fillColor(t: Target) = StyleOps.fillColor(index, t, lf(t))
     fun strokeColor(t: Target) = StyleOps.strokeColor(index, t, lf(t))
     fun strokeWidth(t: Target) = StyleOps.strokeWidth(index, t, lf(t))
+    fun gradientOf(t: Target): GradientValues? = StyleOps.gradient(index, t, lf(t))
+
+    fun addGradientFill(t: Target): Boolean {
+        var added = false
+        edit("Add gradient fill") { group(t)?.let { added = StyleOps.ensureGradient(it) != null } }
+        return added
+    }
+
+    fun setGradient(t: Target, value: GradientValues) = edit("Gradient fill") {
+        StyleOps.firstOf(index, t, ShapeKind.GRADIENT_FILL)?.let { StyleOps.setGradient(it, lf(t), value) }
+    }
+
+    fun removeGradientFill(t: Target) = edit("Remove gradient fill") {
+        group(t)?.let { StyleOps.remove(it, "gf") }
+    }
 
     private fun group(t: Target): JsonObjOrNull = when (t) {
         is ShapeTarget -> index.shapeRaw(t.ref)?.takeIf { it.string("ty") == "gr" }
@@ -127,6 +146,60 @@ class EditorSession(val doc: LottieDocument) {
     fun rename(t: Target, name: String) = edit("Rename") { when (t) { is LayerTarget -> LayerOps.rename(index, t.layer, name); is ShapeTarget -> ShapeOps.rename(index, t.ref, name) } }
     fun setHidden(t: Target, hidden: Boolean) = edit("Visibility") { when (t) { is LayerTarget -> LayerOps.setHidden(index, t.layer, hidden); is ShapeTarget -> ShapeOps.setHidden(index, t.ref, hidden) } }
 
+    fun layerTiming(ref: LayerRef): LayerTiming? {
+        val raw = index.layerRaw(ref) ?: return null
+        return LayerTiming(raw.double("ip") ?: doc.inPoint, raw.double("op") ?: doc.outPoint, raw.double("st") ?: 0.0, (raw.double("sr") ?: 1.0).coerceAtLeast(0.01))
+    }
+
+    fun setLayerTiming(ref: LayerRef, value: LayerTiming) = edit("Layer timing") {
+        val raw = index.layerRaw(ref) ?: return@edit
+        val start = value.inPoint.coerceAtLeast(0.0)
+        val end = value.outPoint.coerceAtLeast(start + 1.0)
+        raw.putDouble("ip", start)
+        raw.putDouble("op", end)
+        raw.putDouble("st", value.startTime)
+        raw.putDouble("sr", value.stretch.coerceIn(0.01, 100.0))
+    }
+
+    /**
+     * Creates an Add-mode mask from a direct child path in the same shape layer.
+     * Restricting the source to a top-level path avoids silently losing nested group transforms.
+     */
+    fun addMaskFromPath(target: LayerRef, source: ShapeRef, inverted: Boolean = false): Boolean {
+        if (source.layer != target || source.path.size != 1) return false
+        val shape = index.shapeRaw(source)?.takeIf { it.string("ty") == "sh" } ?: return false
+        val path = PathEdit.read(shape, Spaces.localFrame(index, target.scope, frame)) ?: return false
+        var added = false
+        edit("Create mask") {
+            val layer = index.layerRaw(target) ?: return@edit
+            val masks = layer.arr("masksProperties") ?: JsonArr().also { layer["masksProperties"] = it }
+            val mask = obj(
+                "mode" to str("a"),
+                "pt" to staticPathProp(path),
+                "o" to staticProp(100.0),
+                "x" to staticProp(0.0),
+                "nm" to str("Mask ${masks.items.size + 1}"),
+            ).also { it.putBool("inv", inverted) }
+            masks.items.add(mask)
+            added = true
+        }
+        return added
+    }
+
+    /** Inversion flags for masks on a layer. Mask geometry stays in the original Lottie document tree. */
+    fun maskInversions(ref: LayerRef): List<Boolean> =
+        index.layerRaw(ref)?.arr("masksProperties")?.items?.filterIsInstance<JsonObj>()?.map { it.bool("inv") ?: false }.orEmpty()
+
+    fun setMaskInverted(ref: LayerRef, maskIndex: Int, inverted: Boolean) = edit("Invert mask") {
+        val mask = index.layerRaw(ref)?.arr("masksProperties")?.items?.getOrNull(maskIndex) as? JsonObj ?: return@edit
+        mask.putBool("inv", inverted)
+    }
+
+    fun removeMask(ref: LayerRef, maskIndex: Int) = edit("Remove mask") {
+        val masks = index.layerRaw(ref)?.arr("masksProperties") ?: return@edit
+        if (maskIndex in masks.items.indices) masks.items.removeAt(maskIndex)
+    }
+
     fun deleteSelection(): Boolean {
         if (selection.isEmpty()) return false
         // delete deepest/last first so earlier refs stay valid
@@ -137,6 +210,13 @@ class EditorSession(val doc: LottieDocument) {
             targets.filterIsInstance<LayerTarget>().sortedWith(compareBy({ it.layer.scope ?: "" }, { it.layer.index })).asReversed().forEach { ParentOps.releaseChildren(index, it.layer, frame); LayerOps.delete(index, it.layer) }
         }
         select(emptyList()); return true
+    }
+
+    /** Replaces vector artwork and keeps the destination layer's own properties. */
+    fun replaceLayerContents(target: LayerRef, source: LayerRef): OpResult {
+        val result = edit("Replace layer contents") { LayerOps.replaceContents(index, target, source) }
+        if (result is OpResult.Ok) select(listOf(LayerTarget(target)))
+        return result
     }
 
     fun duplicateSelection() {
@@ -285,6 +365,29 @@ class EditorSession(val doc: LottieDocument) {
         return addLayer(name, doc.width / 2.0, doc.height / 2.0, color, g)
     }
 
+    /** Adds imported/system font glyphs as filled, editable vector contours. */
+    fun addOutlinedText(contours: List<Bezier>, scale: Double, color: Rgba, name: String = "Text"): LayerTarget? {
+        if (contours.isEmpty()) return null
+        var minX = Double.MAX_VALUE; var minY = Double.MAX_VALUE
+        var maxX = -Double.MAX_VALUE; var maxY = -Double.MAX_VALUE
+        contours.forEach { path ->
+            for (i in 0 until path.count) {
+                minX = minOf(minX, path.v[i * 2]); maxX = maxOf(maxX, path.v[i * 2])
+                minY = minOf(minY, path.v[i * 2 + 1]); maxY = maxOf(maxY, path.v[i * 2 + 1])
+            }
+        }
+        val cx = (minX + maxX) / 2.0
+        val cy = (minY + maxY) / 2.0
+        val items = contours.mapIndexed { index, path ->
+            val vertices = DoubleArray(path.v.size) { i ->
+                (path.v[i] - if (i % 2 == 0) cx else cy) * scale
+            }
+            Creator.pathItem(Bezier(true, vertices, DoubleArray(vertices.size), DoubleArray(vertices.size)), "Glyph contour ${index + 1}")
+        } + Creator.fill(color)
+        val group = Creator.group(name, *items.toTypedArray())
+        return addLayer(name, doc.width / 2.0, doc.height / 2.0, color, group)
+    }
+
     // ---- path (node) editing -----------------------------------------------------------------------
 
     /** The `sh` item the node editor works on for the current selection (a path, or a group's first path). */
@@ -388,6 +491,10 @@ class EditorSession(val doc: LottieDocument) {
 
     fun addKeyframe(p: PropEntry, scope: String? = null) = edit("Add keyframe") { KeyframeOps.addAt(p.prop, Spaces.localFrame(index, scope, frame), p.kind == PropKind.PATH) }
     fun removeKeyframe(p: PropEntry, i: Int) = edit("Delete keyframe") { KeyframeOps.remove(p.prop, i) }
+    /** Deletes a set of keyframes from one property; callers can wrap multiple rows in one gesture. */
+    fun removeKeyframes(p: PropEntry, indices: List<Int>) = edit("Delete keyframes") {
+        indices.distinct().sortedDescending().forEach { i -> KeyframeOps.remove(p.prop, i) }
+    }
     fun moveKeyframe(p: PropEntry, i: Int, toFrame: Double) = edit("Move keyframe") { KeyframeOps.move(p.prop, i, toFrame.coerceIn(doc.inPoint, doc.outPoint)) }
     fun setKeyframeValue(p: PropEntry, i: Int, v: DoubleArray) = edit("Keyframe value") { KeyframeOps.setValues(p.prop, i, v) }
     fun setInterpolation(p: PropEntry, i: Int, m: Interp) = edit("Interpolation") { KeyframeOps.setInterpolation(p.prop, i, m) }
@@ -395,7 +502,16 @@ class EditorSession(val doc: LottieDocument) {
     fun pasteKeyframe(p: PropEntry, kf: ir.sina.tgsstudio.document.json.JsonObj) = edit("Paste keyframe") { KeyframeOps.paste(p.prop, kf, frame) }
     fun valueAt(p: PropEntry): DoubleArray? = PropEval.values(p.prop, frame)
 
-    fun setFrameRate(fps: Double) = edit("Frame rate") { doc.frameRate = fps }
+    fun setFrameRate(fps: Double) = edit("Frame rate") { doc.frameRate = fps.coerceIn(1.0, 120.0) }
+
+    /** Changes the composition work area without deleting keyframes outside the new range. */
+    fun setWorkArea(startFrame: Double, endFrame: Double) = edit("Work area") {
+        val start = startFrame.coerceAtLeast(0.0)
+        val end = endFrame.coerceAtLeast(start + 1.0)
+        doc.inPoint = start
+        doc.outPoint = end
+        frame = frame.coerceIn(start, end - 1.0)
+    }
 }
 
 private typealias JsonObjOrNull = ir.sina.tgsstudio.document.json.JsonObj?

@@ -189,6 +189,16 @@ object TransformOps {
     }
 }
 
+data class GradientValues(
+    val radial: Boolean,
+    val startX: Double,
+    val startY: Double,
+    val endX: Double,
+    val endY: Double,
+    val startColor: Rgba,
+    val endColor: Rgba,
+)
+
 object StyleOps {
     fun firstOf(idx: DocIndex, t: Target, vararg kinds: ShapeKind): JsonObj? =
         Targets.styleItems(idx, t).firstOrNull { ShapeKind.fromCode(it.string("ty")) in kinds }
@@ -196,6 +206,38 @@ object StyleOps {
     fun fillColor(idx: DocIndex, t: Target, frame: Double): Rgba? = colorOf(firstOf(idx, t, ShapeKind.FILL), frame)
     fun strokeColor(idx: DocIndex, t: Target, frame: Double): Rgba? = colorOf(firstOf(idx, t, ShapeKind.STROKE), frame)
     fun strokeWidth(idx: DocIndex, t: Target, frame: Double): Double? = firstOf(idx, t, ShapeKind.STROKE)?.obj("w")?.let { PropEval.number(it, frame, 1.0) }
+
+    fun gradient(idx: DocIndex, t: Target, frame: Double): GradientValues? {
+        val item = firstOf(idx, t, ShapeKind.GRADIENT_FILL) ?: return null
+        val g = item.obj("g") ?: return null
+        val count = g.int("p") ?: return null
+        val values = PropEval.values(g.obj("k"), frame) ?: return null
+        val start = PropEval.values(item.obj("s"), frame) ?: return null
+        val end = PropEval.values(item.obj("e"), frame) ?: return null
+        if (count < 2 || values.size < count * 4 || start.size < 2 || end.size < 2) return null
+        val last = (count - 1) * 4
+        return GradientValues(
+            (item.int("t") ?: 1) == 2, start[0], start[1], end[0], end[1],
+            Rgba(values[1], values[2], values[3], 1.0), Rgba(values[last + 1], values[last + 2], values[last + 3], 1.0),
+        )
+    }
+
+    fun ensureGradient(group: JsonObj): JsonObj? = ensure(group, "gf") { Creator.gradientFill() }
+
+    /** Writes two endpoint colors and geometry while retaining standard Lottie gradient structure. */
+    fun setGradient(item: JsonObj, frame: Double, value: GradientValues) {
+        val g = item.obj("g") ?: return
+        val stops = g.obj("k") ?: return
+        // The current inspector edits endpoint colors; normalize to two stops rather than leave a stale stop count.
+        g.putInt("p", 2)
+        PropWrite.setValues(stops, frame, doubleArrayOf(
+            0.0, value.startColor.r, value.startColor.g, value.startColor.b,
+            1.0, value.endColor.r, value.endColor.g, value.endColor.b,
+        ))
+        item.obj("s")?.let { PropWrite.setValues(it, frame, doubleArrayOf(value.startX, value.startY)) }
+        item.obj("e")?.let { PropWrite.setValues(it, frame, doubleArrayOf(value.endX, value.endY)) }
+        item.putInt("t", if (value.radial) 2 else 1)
+    }
 
     private fun colorOf(item: JsonObj?, frame: Double): Rgba? {
         val c = PropEval.values(item?.obj("c"), frame) ?: return null

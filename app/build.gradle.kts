@@ -4,6 +4,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val signingStoreFile = System.getenv("SIGNING_STORE_FILE")
+val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
+val signingKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
+val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    signingStoreFile,
+    signingStorePassword,
+    signingKeyAlias,
+    signingKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "ir.sina.tgsstudio"
     compileSdk = 35
@@ -12,12 +23,30 @@ android {
         applicationId = "ir.sina.tgsstudio"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(signingStoreFile!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
-        release { isMinifyEnabled = false }
+        getByName("release") {
+            isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

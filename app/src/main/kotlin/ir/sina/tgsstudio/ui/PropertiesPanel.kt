@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.sina.tgsstudio.editor.AnimatedProps
 import ir.sina.tgsstudio.editor.KeyframeOps
+import ir.sina.tgsstudio.editor.GradientValues
 import ir.sina.tgsstudio.editor.LayerTarget
 import ir.sina.tgsstudio.editor.PathOps
 import ir.sina.tgsstudio.editor.PropEntry
@@ -40,6 +41,7 @@ import ir.sina.tgsstudio.renderer.Rgba
 fun propLabel(key: String): String = when (key) {
     "a" -> tr("Anchor", "نقطهٔ لنگر"); "p", "position" -> tr("Position", "موقعیت"); "s" -> tr("Scale", "مقیاس"); "r" -> tr("Rotation", "چرخش")
     "o" -> tr("Opacity", "شفافیت"); "c" -> tr("Color", "رنگ"); "w" -> tr("Stroke width", "ضخامت خط"); "path" -> tr("Path", "مسیر")
+    "gradient" -> tr("Gradient stops", "ایستگاه‌های گرادیان"); "start" -> tr("Gradient start", "شروع گرادیان"); "end" -> tr("Gradient end", "پایان گرادیان")
     "size" -> tr("Size", "اندازه"); "roundness" -> tr("Roundness", "گردی گوشه"); "points" -> tr("Points", "تعداد نقاط")
     "outer" -> tr("Outer radius", "شعاع بیرونی"); "inner" -> tr("Inner radius", "شعاع درونی")
     "start" -> tr("Trim start %", "شروع برش ٪"); "end" -> tr("Trim end %", "پایان برش ٪"); "offset" -> tr("Trim offset °", "جابه‌جایی برش °")
@@ -62,6 +64,10 @@ fun PropertiesPanel(state: EditorState) {
             return@Column
         }
         key(tick) { TransformSection(state, target) }
+        if (target is LayerTarget) {
+            key(tick) { LayerTimingSection(state, target) }
+            key(tick) { MaskSection(state, target) }
+        }
         key(tick) { AppearanceSection(state, target) }
         key(tick) { ShapeSection(state, target) }
         key(tick) { TrimSection(state, target) }
@@ -69,6 +75,56 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { AnimationSection(state, target) }
         key(tick) { EffectsSection(state, target) }
         key(tick) { AdvancedSection(state, target) }
+    }
+}
+
+@Composable
+private fun MaskSection(state: EditorState, target: LayerTarget) {
+    val masks = state.session.maskInversions(target.layer)
+    val selectedPath = state.session.selection.filterIsInstance<ShapeTarget>()
+        .firstOrNull { it.layer == target.layer && it.ref.path.size == 1 }
+    Section(tr("Masks", "ماسک‌ها"), defaultOpen = false) {
+        SmallButton(
+            tr("Create from selected path", "ساخت از مسیر انتخاب‌شده"),
+            {
+                val ok = selectedPath?.let { state.act { addMaskFromPath(target.layer, it.ref) } } ?: false
+                state.message = if (ok) (if (state.isFa) "ماسک ساخته شد" else "Mask created") else (if (state.isFa) "یک مسیر مستقیم از همین لایه انتخاب کنید" else "Select a top-level path in this layer")
+            },
+            enabled = selectedPath != null,
+            ic = Ic.Add,
+        )
+        if (masks.isEmpty()) {
+            Text(tr("No masks in this layer.", "این لایه ماسکی ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
+        } else {
+            masks.forEachIndexed { index, inverted ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${tr("Mask", "ماسک")} ${index + 1}", color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(tr("Invert", "معکوس"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    Switch(
+                        checked = inverted,
+                        onCheckedChange = { state.act { setMaskInverted(target.layer, index, it) } },
+                        colors = SwitchDefaults.colors(checkedThumbColor = StudioColors.Accent),
+                    )
+                    IconBtn(Ic.Trash, { state.act { removeMask(target.layer, index) } }, size = 34.dp, iconSize = 17.dp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LayerTimingSection(state: EditorState, target: LayerTarget) {
+    val timing = state.session.layerTiming(target.layer) ?: return
+    Section(tr("Layer timing", "زمان‌بندی لایه"), defaultOpen = false) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(timing.inPoint, { state.act { setLayerTiming(target.layer, timing.copy(inPoint = it)) } }, Modifier.weight(1f), decimals = 0, label = "In")
+            NumberField(timing.outPoint, { state.act { setLayerTiming(target.layer, timing.copy(outPoint = it)) } }, Modifier.weight(1f), decimals = 0, label = "Out")
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(timing.startTime, { state.act { setLayerTiming(target.layer, timing.copy(startTime = it)) } }, Modifier.weight(1f), decimals = 1, label = "Start")
+            NumberField(timing.stretch, { state.act { setLayerTiming(target.layer, timing.copy(stretch = it)) } }, Modifier.weight(1f), decimals = 2, label = "Stretch")
+        }
+        Text(tr("Timing values are in composition frames; stretch 1.0 is normal speed.", "مقادیر زمان برحسب فریم کامپوزیشن هستند؛ ضریب ۱ سرعت عادی است."), color = StudioColors.TextMuted, fontSize = 11.sp)
     }
 }
 
@@ -122,6 +178,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
     val v = state.session.transformOf(t) ?: return
     var picking by remember { mutableStateOf<String?>(null) }
     val fill = state.session.fillColor(t); val stroke = state.session.strokeColor(t)
+    val gradient = state.session.gradientOf(t)
     Section(tr("Appearance", "ظاهر")) {
         Labeled(tr("Opacity", "شفافیت")) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,6 +196,28 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             Swatch(stroke?.toColor(), { picking = "stroke" })
             if (stroke != null) IconBtn(Ic.Trash, { state.act { removeStroke(t) } }, size = 36.dp, iconSize = 18.dp)
         }
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(tr("Gradient", "گرادیان"), color = StudioColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            if (gradient == null) {
+                SmallButton(tr("Add", "افزودن"), { state.act { addGradientFill(t) } }, ic = Ic.Add)
+            } else {
+                Swatch(gradient.startColor.toColor(), { picking = "gradientStart" })
+                Swatch(gradient.endColor.toColor(), { picking = "gradientEnd" })
+                IconBtn(Ic.Trash, { state.act { removeGradientFill(t) } }, size = 36.dp, iconSize = 18.dp)
+            }
+        }
+        if (gradient != null) {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallButton(tr("Linear", "خطی"), { state.act { setGradient(t, gradient.copy(radial = false)) } }, primary = !gradient.radial)
+                SmallButton(tr("Radial", "شعاعی"), { state.act { setGradient(t, gradient.copy(radial = true)) } }, primary = gradient.radial)
+            }
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NumberField(gradient.startX, { state.act { setGradient(t, gradient.copy(startX = it)) } }, Modifier.weight(1f), label = "X1")
+                NumberField(gradient.startY, { state.act { setGradient(t, gradient.copy(startY = it)) } }, Modifier.weight(1f), label = "Y1")
+                NumberField(gradient.endX, { state.act { setGradient(t, gradient.copy(endX = it)) } }, Modifier.weight(1f), label = "X2")
+                NumberField(gradient.endY, { state.act { setGradient(t, gradient.copy(endY = it)) } }, Modifier.weight(1f), label = "Y2")
+            }
+        }
         state.session.strokeWidth(t)?.let { w ->
             Labeled(tr("Stroke width", "ضخامت خط")) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,10 +228,25 @@ private fun AppearanceSection(state: EditorState, t: Target) {
         }
     }
     picking?.let { which ->
-        val initial = (if (which == "fill") fill else stroke) ?: Rgba(0.12, 0.48, 1.0, 1.0)
+        val initial = when (which) {
+            "fill" -> fill
+            "stroke" -> stroke
+            "gradientStart" -> gradient?.startColor
+            "gradientEnd" -> gradient?.endColor
+            else -> null
+        } ?: Rgba(0.12, 0.48, 1.0, 1.0)
         ColorPickerDialog(
             initial,
-            onPick = { c -> if (!state.session.history.isGestureOpen) state.session.beginGesture("Color"); if (which == "fill") state.session.setFillColor(t, c) else state.session.setStrokeColor(t, c); state.changed() },
+            onPick = { c ->
+                if (!state.session.history.isGestureOpen) state.session.beginGesture("Color")
+                when (which) {
+                    "fill" -> state.session.setFillColor(t, c)
+                    "stroke" -> state.session.setStrokeColor(t, c)
+                    "gradientStart" -> gradient?.let { state.session.setGradient(t, it.copy(startColor = c)) }
+                    "gradientEnd" -> gradient?.let { state.session.setGradient(t, it.copy(endColor = c)) }
+                }
+                state.changed()
+            },
             onDone = { state.session.endGesture(); picking = null; state.changed() },
         )
     }
