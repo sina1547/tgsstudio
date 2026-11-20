@@ -69,8 +69,23 @@ fun TimelinePanel(state: EditorState) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Ic.Timeline, StudioColors.Accent, 20.dp)
                 Text(tr("Timeline", "تایم‌لاین"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 36.dp, iconSize = 18.dp)
-                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 36.dp, iconSize = 18.dp)
+                IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 34.dp, iconSize = 17.dp)
+                NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(76.dp), decimals = 0, label = "F")
+                IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
+                val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
+                IconBtn(Ic.Add, {
+                    val ri = activeRow
+                    if (ri != null) {
+                        val entry = rows[ri]
+                        state.act { addKeyframe(entry, scope) }
+                        val localFrame = Spaces.localFrame(state.session.index, scope, state.frame)
+                        val ki = KeyframeOps.times(entry.prop).indexOfFirst { abs(it - localFrame) < 0.5 }
+                        if (ki >= 0) state.selectedKey = ri to ki
+                        state.changed()
+                    }
+                }, enabled = activeRow != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
+                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 17.dp)
+                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 17.dp)
             }
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
 
