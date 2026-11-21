@@ -73,7 +73,7 @@ fun EditorCanvas(state: EditorState, modifier: Modifier = Modifier) {
             .pointerInput(state, state.tool, density) { canvasGestures(state, density) },
     ) {
         withTransform({ translate(state.viewOffset.x, state.viewOffset.y); scale(state.viewScale, state.viewScale, Offset.Zero) }) {
-            drawRect(compositionBackground ?: checker, size = Size(docW, docH))
+            if (compositionBackground != null) drawRect(compositionBackground, size = Size(docW, docH)) else drawRect(checker, size = Size(docW, docH))
             clipRect(0f, 0f, docW, docH) { drawScene(scene) }
             drawRect(Color(0x55FFFFFF), size = Size(docW, docH), style = Stroke(1f / state.viewScale))
         }
