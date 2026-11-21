@@ -79,7 +79,7 @@ fun GalleryScreen(
 
     LazyVerticalGrid(
         GridCells.Adaptive(150.dp),
-        Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding(),
+        Modifier.fillMaxSize().background(StudioColors.Background),
         contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
