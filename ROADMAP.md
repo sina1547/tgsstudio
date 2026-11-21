@@ -5,7 +5,7 @@ This project is being advanced incrementally without replacing its working docum
 ## Foundation
 - [x] Immersive editor workspace
 - [x] Debounced autosave plus lifecycle save fallback
-- [ ] Crash-recovery journal and project snapshots
+- [ ] Crash-recovery journal and project snapshots (validated previous-TGS fallback is implemented; user-facing recovery history and snapshot selection remain pending)
 - [ ] Stable release signing configuration (requires owner-controlled signing secrets)
 
 ## Timeline and animation
