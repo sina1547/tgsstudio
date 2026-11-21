@@ -59,6 +59,7 @@ fun TimelinePanel(state: EditorState) {
     val tick = state.tick
     val doc = state.session.doc
     val target = state.session.selection.firstOrNull()
+    val splitHint = tr("Move the playhead inside the selected layer.", "نشانگر زمان را داخل لایهٔ انتخاب‌شده قرار دهید.")
     val rows = remember(tick, target) { if (target == null) emptyList() else state.session.animatedProps(target) }
     val scope = target?.layer?.scope
     val density = LocalDensity.current.density
@@ -82,7 +83,7 @@ fun TimelinePanel(state: EditorState) {
                 IconBtn(Ic.Split, {
                     selectedLayer?.let { layer ->
                         val result = state.act { splitLayer(layer.layer, state.frame) }
-                        if (result == null) state.message = tr("Move the playhead inside the selected layer.", "نشانگر زمان را داخل لایهٔ انتخاب‌شده قرار دهید.")
+                        if (result == null) state.message = splitHint
                     }
                 }, enabled = selectedLayer != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
                 val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
