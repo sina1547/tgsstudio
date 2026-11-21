@@ -330,6 +330,10 @@ class EditorSession(val doc: LottieDocument) {
     fun addPolygon(cx: Double, cy: Double, radius: Double, points: Int = 6, color: Rgba = Creator.DEFAULT_FILL) =
         addLayer("Polygon", cx, cy, color, Creator.group("Polygon", Creator.polygonPath(points, radius), Creator.fill(color)))
 
+    /** Adds a real empty vector group as a selectable shape layer. */
+    fun addEmptyGroup(cx: Double = doc.width / 2.0, cy: Double = doc.height / 2.0) =
+        addLayer("Empty Group", cx, cy, null, Creator.group("Empty Group"))
+
     /** A freeform path drawn in document coordinates (e.g. by the pen tool). */
     fun addFreeform(b: Bezier, color: Rgba = Creator.DEFAULT_FILL, filled: Boolean = b.closed, strokeWidth: Double = 6.0): LayerTarget? {
         if (b.count < 2) return null
