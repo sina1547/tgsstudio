@@ -10,7 +10,7 @@ import java.util.UUID
 
 data class ProjectInfo(val id: String, val name: String, val modified: Long)
 
-/** Projects live in the app's private storage as `<id>.tgs` plus a PNG thumbnail and a small index file. */
+/** Projects live in private storage as a TGS document, thumbnail, and index entry. */
 class ProjectStore(context: Context) {
     private val dir = File(context.filesDir, "projects").apply { mkdirs() }
     private val index = File(dir, "index.json")
@@ -28,31 +28,90 @@ class ProjectStore(context: Context) {
         index.writeText(arr.toString())
     }
 
+    private fun documentFile(id: String) = File(dir, "$id.tgs")
+    private fun snapshotFile(id: String) = File(dir, "$id.tgs.bak")
+
+    /**
+     * Preserve the last readable document before replacing it. A corrupt/incomplete current
+     * file is never promoted to the recovery snapshot.
+     */
+    private fun preserveLastGood(target: File) {
+        if (!target.isFile) return
+        val previous = runCatching { target.readBytes() }.getOrNull() ?: return
+        if (runCatching { TgsCodec.read(previous) }.isFailure) return
+        val snapshot = File(dir, "${target.name}.bak")
+        val tmp = File(dir, "${snapshot.name}.tmp")
+        runCatching {
+            tmp.writeBytes(previous)
+            if (!tmp.renameTo(snapshot)) {
+                snapshot.writeBytes(tmp.readBytes())
+                tmp.delete()
+            }
+        }
+    }
+
+    /** Replace a project file via a sibling temporary file. */
+    private fun writeAtomically(target: File, bytes: ByteArray) {
+        val tmp = File(dir, "${target.name}.tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(target)) {
+            target.writeBytes(tmp.readBytes())
+            tmp.delete()
+        }
+    }
+
     fun create(doc: LottieDocument, name: String): ProjectInfo {
         val info = ProjectInfo(UUID.randomUUID().toString(), name, System.currentTimeMillis())
-        File(dir, "${info.id}.tgs").writeBytes(TgsCodec.writeTgs(doc))
+        writeAtomically(documentFile(info.id), TgsCodec.writeTgs(doc))
         writeIndex(list() + info)
         return info
     }
 
-    /** Writes the document (and thumbnail when given) atomically enough for a crash not to lose the previous version. */
+    /** Save a new version while retaining the last known-good TGS snapshot for recovery. */
     fun save(id: String, doc: LottieDocument, thumbnailPng: ByteArray?) {
-        val target = File(dir, "$id.tgs")
-        val tmp = File(dir, "$id.tgs.tmp")
-        tmp.writeBytes(TgsCodec.writeTgs(doc))
-        if (!tmp.renameTo(target)) { target.writeBytes(tmp.readBytes()); tmp.delete() }
+        val target = documentFile(id)
+        preserveLastGood(target)
+        writeAtomically(target, TgsCodec.writeTgs(doc))
         thumbnailPng?.let { File(dir, "$id.png").writeBytes(it) }
         writeIndex(list().map { if (it.id == id) it.copy(modified = System.currentTimeMillis()) else it })
     }
 
-    fun load(id: String): LottieDocument = TgsCodec.read(File(dir, "$id.tgs").readBytes())
+    /**
+     * Load the current project. If it is missing or invalid, recover the previous validated
+     * snapshot and restore it to the primary path before returning it.
+     */
+    fun load(id: String): LottieDocument {
+        val target = documentFile(id)
+        val current = runCatching { TgsCodec.read(target.readBytes()) }
+        current.getOrNull()?.let { return it }
+
+        val backup = snapshotFile(id)
+        val backupBytes = runCatching { backup.takeIf { it.isFile }?.readBytes() }.getOrNull()
+        if (backupBytes != null) {
+            val recovered = runCatching { TgsCodec.read(backupBytes) }
+            recovered.getOrNull()?.let { document ->
+                runCatching { writeAtomically(target, backupBytes) }
+                return document
+            }
+        }
+        throw current.exceptionOrNull()
+            ?: IllegalStateException("Project $id has no valid current or recovery snapshot")
+    }
+
+    /** True when a validated previous version is available for this project. */
+    fun hasRecoverySnapshot(id: String): Boolean {
+        val backup = snapshotFile(id)
+        return backup.isFile && runCatching { TgsCodec.read(backup.readBytes()) }.isSuccess
+    }
 
     fun thumbnail(id: String): File? = File(dir, "$id.png").takeIf { it.exists() }
 
     fun rename(id: String, name: String) = writeIndex(list().map { if (it.id == id) it.copy(name = name) else it })
 
     fun delete(id: String) {
-        File(dir, "$id.tgs").delete(); File(dir, "$id.png").delete()
+        documentFile(id).delete()
+        snapshotFile(id).delete()
+        File(dir, "$id.png").delete()
         writeIndex(list().filter { it.id != id })
     }
 
