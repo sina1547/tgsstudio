@@ -72,6 +72,71 @@ class EditorSession(val doc: LottieDocument) {
         return box
     }
 
+    /** Align selected objects to the composition bounds using their rendered document-space bounds. */
+    fun alignSelection(horizontal: String? = null, vertical: String? = null): Boolean {
+        if (horizontal == null && vertical == null) return false
+        val sc = scene()
+        val items = movable().mapNotNull { target ->
+            val bounds = when (target) {
+                is LayerTarget -> Hit.bounds(sc, target.layer)
+                is ShapeTarget -> Hit.bounds(sc, target.layer, target.ref.path)
+            } ?: return@mapNotNull null
+            target to bounds
+        }
+        if (items.isEmpty()) return false
+        edit("Align selection") {
+            items.forEach { (target, bounds) ->
+                val dx = when (horizontal) {
+                    "left" -> -bounds.minX
+                    "center" -> doc.width / 2.0 - bounds.centerX
+                    "right" -> doc.width - bounds.maxX
+                    else -> 0.0
+                }
+                val dy = when (vertical) {
+                    "top" -> -bounds.minY
+                    "middle" -> doc.height / 2.0 - bounds.centerY
+                    "bottom" -> doc.height - bounds.maxY
+                    else -> 0.0
+                }
+                TransformOps.translateDoc(index, target, frame, dx, dy)
+            }
+        }
+        return true
+    }
+
+    /** Distribute three or more selected objects with equal visual gaps along one axis. */
+    fun distributeSelectionHorizontally(): Boolean = distributeSelection(horizontal = true)
+    fun distributeSelectionVertically(): Boolean = distributeSelection(horizontal = false)
+
+    private fun distributeSelection(horizontal: Boolean): Boolean {
+        val sc = scene()
+        val items = movable().mapNotNull { target ->
+            val bounds = when (target) {
+                is LayerTarget -> Hit.bounds(sc, target.layer)
+                is ShapeTarget -> Hit.bounds(sc, target.layer, target.ref.path)
+            } ?: return@mapNotNull null
+            target to bounds
+        }
+        if (items.size < 3) return false
+        val ordered = if (horizontal) items.sortedBy { it.second.centerX } else items.sortedBy { it.second.centerY }
+        val first = ordered.first().second
+        val last = ordered.last().second
+        val span = if (horizontal) last.maxX - first.minX else last.maxY - first.minY
+        val occupied = ordered.sumOf { if (horizontal) it.second.width else it.second.height }
+        val gap = (span - occupied).coerceAtLeast(0.0) / (ordered.size - 1)
+        var cursor = if (horizontal) first.minX else first.minY
+        edit(if (horizontal) "Distribute horizontally" else "Distribute vertically") {
+            ordered.forEachIndexed { i, (target, bounds) ->
+                val start = if (horizontal) bounds.minX else bounds.minY
+                val delta = if (i == 0) 0.0 else cursor - start
+                if (horizontal) TransformOps.translateDoc(index, target, frame, delta, 0.0)
+                else TransformOps.translateDoc(index, target, frame, 0.0, delta)
+                cursor += (if (horizontal) bounds.width else bounds.height) + gap
+            }
+        }
+        return true
+    }
+
     // ---- gestures (one undo step each) -------------------------------------------------------------
 
     fun beginGesture(label: String) = history.begin(label)
