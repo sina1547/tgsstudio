@@ -42,7 +42,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +56,6 @@ import kotlin.math.max
 @Composable
 fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: () -> Unit) {
     val context = LocalContext.current
-    val hostView = LocalView.current
     val activity = remember(context) {
         generateSequence(context) { (it as? ContextWrapper)?.baseContext }
             .filterIsInstance<Activity>()
