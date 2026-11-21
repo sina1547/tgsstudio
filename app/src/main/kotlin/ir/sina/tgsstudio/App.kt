@@ -64,7 +64,7 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
             GalleryScreen(
                 store, refresh, setting,
                 onOpen = ::open,
-                onNew = { name -> val doc = Creator.blankDocument(name); open(store.create(doc, name)) },
+                onNew = { name, width, height, fps, background -> val doc = Creator.blankDocument(name, width, height, fps, background); open(store.create(doc, name)) },
                 onImport = { importer.launch(arrayOf("*/*")) },
                 onRename = { p, n -> store.rename(p.id, n); refresh++ },
                 onDelete = { p -> store.delete(p.id); refresh++ },
