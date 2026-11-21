@@ -201,8 +201,17 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             if (gradient == null) {
                 SmallButton(tr("Add", "افزودن"), { state.act { addGradientFill(t) } }, ic = Ic.Add)
             } else {
-                Swatch(gradient.startColor.toColor(), { picking = "gradientStart" })
-                Swatch(gradient.endColor.toColor(), { picking = "gradientEnd" })
+                SmallButton(tr("Add stop", "افزودن توقف"), {
+                    val sorted = gradient.stops.sortedBy { it.position }
+                    val gap = sorted.zipWithNext().maxByOrNull { (a, b) -> b.position - a.position }
+                    if (gap != null) {
+                        val position = (gap.first.position + gap.second.position) / 2.0
+                        val a = gap.first.color; val b = gap.second.color
+                        val mixed = Rgba((a.r + b.r) / 2, (a.g + b.g) / 2, (a.b + b.b) / 2, (a.a + b.a) / 2)
+                        val next = (sorted + ir.sina.tgsstudio.editor.GradientColorStop(position, mixed)).sortedBy { it.position }
+                        state.act { setGradient(t, gradient.copy(stops = next)) }
+                    }
+                }, ic = Ic.Add)
                 IconBtn(Ic.Trash, { state.act { removeGradientFill(t) } }, size = 36.dp, iconSize = 18.dp)
             }
         }
@@ -210,6 +219,21 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SmallButton(tr("Linear", "خطی"), { state.act { setGradient(t, gradient.copy(radial = false)) } }, primary = !gradient.radial)
                 SmallButton(tr("Radial", "شعاعی"), { state.act { setGradient(t, gradient.copy(radial = true)) } }, primary = gradient.radial)
+            }
+            gradient.stops.forEachIndexed { stopIndex, stop ->
+                Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("${(stop.position * 100).toInt()}%", color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Swatch(stop.color.toColor(), { picking = "gradientStop:${stopIndex}" })
+                    NumberField(stop.position * 100.0, { percent ->
+                        val updated = gradient.stops.toMutableList()
+                        updated[stopIndex] = stop.copy(position = (percent / 100.0).coerceIn(0.0, 1.0))
+                        state.act { setGradient(t, gradient.copy(stops = updated.sortedBy { it.position })) }
+                    }, Modifier.weight(1f), decimals = 0, suffix = "%")
+                    if (gradient.stops.size > 2) IconBtn(Ic.Trash, {
+                        val updated = gradient.stops.toMutableList().also { it.removeAt(stopIndex) }
+                        state.act { setGradient(t, gradient.copy(stops = updated)) }
+                    }, size = 32.dp, iconSize = 16.dp)
+                }
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 NumberField(gradient.startX, { state.act { setGradient(t, gradient.copy(startX = it)) } }, Modifier.weight(1f), label = "X1")
@@ -233,7 +257,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             "stroke" -> stroke
             "gradientStart" -> gradient?.startColor
             "gradientEnd" -> gradient?.endColor
-            else -> null
+            else -> if (which.startsWith("gradientStop:")) gradient?.stops?.getOrNull(which.substringAfter(":").toIntOrNull() ?: -1)?.color else null
         } ?: Rgba(0.12, 0.48, 1.0, 1.0)
         ColorPickerDialog(
             initial,
@@ -242,8 +266,12 @@ private fun AppearanceSection(state: EditorState, t: Target) {
                 when (which) {
                     "fill" -> state.session.setFillColor(t, c)
                     "stroke" -> state.session.setStrokeColor(t, c)
-                    "gradientStart" -> gradient?.let { state.session.setGradient(t, it.copy(startColor = c)) }
-                    "gradientEnd" -> gradient?.let { state.session.setGradient(t, it.copy(endColor = c)) }
+                    "gradientStart" -> gradient?.let { state.session.setGradient(t, it.copy(stops = it.stops.mapIndexed { i, stop -> if (i == 0) stop.copy(color = c) else stop })) }
+                    "gradientEnd" -> gradient?.let { state.session.setGradient(t, it.copy(stops = it.stops.mapIndexed { i, stop -> if (i == it.stops.lastIndex) stop.copy(color = c) else stop })) }
+                    else -> if (which.startsWith("gradientStop:")) {
+                        val stopIndex = which.substringAfter(":").toIntOrNull() ?: -1
+                        gradient?.let { g -> if (stopIndex in g.stops.indices) state.session.setGradient(t, g.copy(stops = g.stops.mapIndexed { i, stop -> if (i == stopIndex) stop.copy(color = c) else stop })) }
+                    }
                 }
                 state.changed()
             },
