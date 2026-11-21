@@ -90,13 +90,27 @@ object Creator {
         "ks" to defaultKs(), "ao" to int(0), "ip" to jn(doc.inPoint), "op" to jn(doc.outPoint), "st" to int(0), "bm" to int(0),
     )
 
-    /** A blank 512×512, 60 fps, 3-second composition that already satisfies the TGS limits. */
-    fun blankDocument(name: String): LottieDocument = LottieDocument(
-        obj(
-            "tgs" to int(1), "v" to str("5.5.2"), "fr" to int(60), "ip" to int(0), "op" to int(180), "w" to int(512), "h" to int(512),
-            "nm" to str(name), "ddd" to int(0), "assets" to JsonArr(), "layers" to JsonArr(),
-        ),
-    )
+    /** Creates a blank composition with user-selected dimensions, frame rate and optional solid background. */
+    fun blankDocument(
+        name: String,
+        width: Int = 512,
+        height: Int = 512,
+        frameRate: Double = 60.0,
+        background: String = "transparent",
+    ): LottieDocument {
+        val w = width.coerceIn(16, 4096)
+        val h = height.coerceIn(16, 4096)
+        val fps = frameRate.coerceIn(1.0, 120.0)
+        val root = obj(
+            "tgs" to int(1), "v" to str("5.5.2"), "fr" to jn(fps), "ip" to int(0), "op" to jn(fps * 3.0),
+            "w" to int(w), "h" to int(h), "nm" to str(name), "ddd" to int(0),
+            "assets" to JsonArr(), "layers" to JsonArr(),
+        )
+        if (background != "transparent" && background.matches(Regex("^#[0-9A-Fa-f]{6}$"))) {
+            root.putString("bg", background.removePrefix("#").uppercase())
+        }
+        return LottieDocument(root)
+    }
 
     fun insertLayer(doc: LottieDocument, scope: String?, layer: JsonObj, at: Int = 0): LayerRef? {
         val arr = ir.sina.tgsstudio.document.DocIndex(doc).layerArray(scope) ?: return null
