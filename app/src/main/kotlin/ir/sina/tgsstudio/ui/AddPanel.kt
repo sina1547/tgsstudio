@@ -46,6 +46,7 @@ private fun AddTile(ic: Ic, label: String, onClick: () -> Unit, modifier: Modifi
 @Composable
 fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
     val w = state.session.doc.width / 2.0; val h = state.session.doc.height / 2.0
+    val selectLayersHint = tr("Select one or more layers first.", "ابتدا یک یا چند لایه را انتخاب کنید.")
     fun add(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) { state.act(block); state.tool = Tool.SELECT; state.updatePanel(PanelTab.PROPERTIES) }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -72,7 +73,7 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
             AddTile(Ic.Link, tr("Linked Null", "Null متصل"), {
                 val children = state.session.selection.map { it.layer }.distinct()
                 if (children.isNotEmpty()) state.act { createNullParent(children) }
-                else state.message = tr("Select one or more layers first.", "ابتدا یک یا چند لایه را انتخاب کنید.")
+                else state.message = selectLayersHint
             }, Modifier.weight(1f))
             AddTile(Ic.Group, tr("Empty Group", "گروه خالی"), {
                 state.act { addEmptyGroup(w, h) }; state.updatePanel(PanelTab.PROPERTIES)
