@@ -64,6 +64,7 @@ fun PropertiesPanel(state: EditorState) {
             return@Column
         }
         key(tick) { TransformSection(state, target) }
+        key(tick) { AlignmentSection(state, sel.size) }
         if (target is LayerTarget) {
             key(tick) { LayerTimingSection(state, target) }
             key(tick) { MaskSection(state, target) }
@@ -75,6 +76,30 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { AnimationSection(state, target) }
         key(tick) { EffectsSection(state, target) }
         key(tick) { AdvancedSection(state, target) }
+    }
+}
+
+@Composable
+private fun AlignmentSection(state: EditorState, selectionCount: Int) {
+    Section(tr("Alignment", "تراز و چیدمان"), defaultOpen = false) {
+        Text(tr("Align selected objects to the composition bounds.", "تراز اشیای انتخاب‌شده نسبت به محدودهٔ کامپوزیشن."), color = StudioColors.TextMuted, fontSize = 11.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallButton(tr("Left", "چپ"), { if (!state.act { alignSelection(horizontal = "left") }) state.message = tr("Nothing to align.", "چیزی برای تراز وجود ندارد.") }, enabled = selectionCount > 0)
+            SmallButton(tr("Center X", "وسط افقی"), { state.act { alignSelection(horizontal = "center") } }, enabled = selectionCount > 0)
+            SmallButton(tr("Right", "راست"), { state.act { alignSelection(horizontal = "right") } }, enabled = selectionCount > 0)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallButton(tr("Top", "بالا"), { state.act { alignSelection(vertical = "top") } }, enabled = selectionCount > 0)
+            SmallButton(tr("Center Y", "وسط عمودی"), { state.act { alignSelection(vertical = "middle") } }, enabled = selectionCount > 0)
+            SmallButton(tr("Bottom", "پایین"), { state.act { alignSelection(vertical = "bottom") } }, enabled = selectionCount > 0)
+        }
+        if (selectionCount >= 3) {
+            Text(tr("Equal spacing between selected objects.", "فاصله‌گذاری مساوی بین اشیای انتخاب‌شده."), color = StudioColors.TextMuted, fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallButton(tr("Distribute X", "توزیع افقی"), { state.act { distributeSelectionHorizontally() } })
+                SmallButton(tr("Distribute Y", "توزیع عمودی"), { state.act { distributeSelectionVertically() } })
+            }
+        }
     }
 }
 
