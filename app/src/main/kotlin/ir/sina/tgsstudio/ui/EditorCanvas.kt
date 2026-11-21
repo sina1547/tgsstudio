@@ -57,6 +57,11 @@ fun EditorCanvas(state: EditorState, modifier: Modifier = Modifier) {
     val scene = remember(tick, frame) { state.session.scene(frame) }
     val box = remember(tick, frame, state.tool) { if (state.tool == Tool.SELECT) state.session.selectionBox() else null }
     val docW = state.session.doc.width.toFloat(); val docH = state.session.doc.height.toFloat()
+    val backgroundHex = state.session.doc.root.string("bg")
+    val compositionBackground = remember(backgroundHex) {
+        backgroundHex?.removePrefix("#")?.takeIf { it.matches(Regex("^[0-9A-Fa-f]{6}$")) }
+            ?.let { hex -> runCatching { Color(android.graphics.Color.parseColor("#" + hex)) }.getOrNull() }
+    }
 
     Canvas(
         modifier
@@ -68,7 +73,7 @@ fun EditorCanvas(state: EditorState, modifier: Modifier = Modifier) {
             .pointerInput(state, state.tool, density) { canvasGestures(state, density) },
     ) {
         withTransform({ translate(state.viewOffset.x, state.viewOffset.y); scale(state.viewScale, state.viewScale, Offset.Zero) }) {
-            drawRect(checker, size = Size(docW, docH))
+            drawRect(compositionBackground ?: checker, size = Size(docW, docH))
             clipRect(0f, 0f, docW, docH) { drawScene(scene) }
             drawRect(Color(0x55FFFFFF), size = Size(docW, docH), style = Stroke(1f / state.viewScale))
         }
