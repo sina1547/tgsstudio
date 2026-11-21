@@ -84,7 +84,7 @@ private fun AlignmentSection(state: EditorState, selectionCount: Int) {
     Section(tr("Alignment", "تراز و چیدمان"), defaultOpen = false) {
         Text(tr("Align selected objects to the composition bounds.", "تراز اشیای انتخاب‌شده نسبت به محدودهٔ کامپوزیشن."), color = StudioColors.TextMuted, fontSize = 11.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallButton(tr("Left", "چپ"), { if (!state.act { alignSelection(horizontal = "left") }) state.message = tr("Nothing to align.", "چیزی برای تراز وجود ندارد.") }, enabled = selectionCount > 0)
+            SmallButton(tr("Left", "چپ"), { state.act { alignSelection(horizontal = "left") } }, enabled = selectionCount > 0)
             SmallButton(tr("Center X", "وسط افقی"), { state.act { alignSelection(horizontal = "center") } }, enabled = selectionCount > 0)
             SmallButton(tr("Right", "راست"), { state.act { alignSelection(horizontal = "right") } }, enabled = selectionCount > 0)
         }
