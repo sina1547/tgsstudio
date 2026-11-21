@@ -175,12 +175,11 @@ class EditorSession(val doc: LottieDocument) {
         if (split <= start || split >= end) return null
         val copy = source.deepCopy() as JsonObj
         val stretch = (source.double("sr") ?: 1.0).coerceAtLeast(0.01)
-        val sourceStartTime = source.double("st") ?: 0.0
         edit("Split layer") {
             source.putDouble("op", split)
             copy.putDouble("ip", split)
             copy.putDouble("op", end)
-            copy.putDouble("st", sourceStartTime + (split - start) * stretch)
+            // Keep the original start time and stretch so the duplicated segment continues the same animation phase.
             copy.putInt("ind", Creator.nextIndex(layers))
             copy.putString("nm", (source.string("nm") ?: "Layer") + " - 2")
             layers.items.add(ref.index, copy)
