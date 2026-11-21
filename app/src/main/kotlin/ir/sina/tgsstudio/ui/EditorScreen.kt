@@ -1,5 +1,6 @@
 package ir.sina.tgsstudio.ui
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,6 +28,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +41,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +58,23 @@ import kotlin.math.max
 @Composable
 fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: () -> Unit) {
     val context = LocalContext.current
+    val window = (context as? Activity)?.window
+    DisposableEffect(window) {
+        if (window == null) {
+            onDispose { }
+        } else {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            val previousBehavior = controller.systemBarsBehavior
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = previousBehavior
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+            }
+        }
+    }
     SideEffect { state.isFa = lang == Lang.FA }
     val doc = state.session.doc
     var showExport by remember { mutableStateOf(false) }
@@ -68,6 +90,21 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
             .onFailure { state.message = if (lang == Lang.FA) "ذخیره نشد" else "Couldn't save" }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (state.dirty) runCatching { store.save(state.projectId, doc, renderThumbnail(doc)); state.markSaved() } }
+
+    // Debounced document autosave; frequent playback/UI updates never trigger immediate disk writes.
+    LaunchedEffect(state.tick) {
+        if (state.dirty) {
+            delay(1200)
+            if (state.dirty) {
+                runCatching {
+                    store.save(state.projectId, doc, renderThumbnail(doc))
+                    state.markSaved()
+                }.onFailure {
+                    state.message = if (lang == Lang.FA) "ذخیره خودکار ناموفق بود" else "Auto-save failed"
+                }
+            }
+        }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val kind = pendingKind
@@ -125,7 +162,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         val wide = maxWidth >= 700.dp && state.workspace == Workspace.ADVANCED && !state.previewMode
         val maxPanel = (maxHeight.value * 0.7f).coerceAtLeast(160f)
         Column(Modifier.fillMaxSize()) {
