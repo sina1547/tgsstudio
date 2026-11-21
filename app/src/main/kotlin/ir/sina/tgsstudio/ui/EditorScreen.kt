@@ -172,8 +172,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         val maxPanel = (maxHeight.value * 0.7f).coerceAtLeast(160f)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
-            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
-
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (wide) {
                     Row(Modifier.fillMaxSize()) {
@@ -211,6 +209,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 }
             }
             if (!state.previewMode && !wide) Dock(state)
+            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
         }
     }
 
