@@ -6,6 +6,7 @@ import ir.sina.tgsstudio.document.LottieDocument
 import ir.sina.tgsstudio.document.ShapeKind
 import ir.sina.tgsstudio.document.json.JsonArr
 import ir.sina.tgsstudio.document.json.JsonObj
+import ir.sina.tgsstudio.document.json.deepCopy
 import ir.sina.tgsstudio.document.ShapeRef
 import ir.sina.tgsstudio.renderer.Bezier
 import ir.sina.tgsstudio.renderer.PropEval
@@ -159,6 +160,34 @@ class EditorSession(val doc: LottieDocument) {
         raw.putDouble("op", end)
         raw.putDouble("st", value.startTime)
         raw.putDouble("sr", value.stretch.coerceIn(0.01, 100.0))
+    }
+
+
+    /**
+     * Split a layer at the playhead while preserving the animation phase of the second segment.
+     */
+    fun splitLayer(ref: LayerRef, atFrame: Double = frame): LayerRef? {
+        val layers = index.layerArray(ref.scope) ?: return null
+        val source = layers.items.getOrNull(ref.index) as? JsonObj ?: return null
+        val start = source.double("ip") ?: doc.inPoint
+        val end = source.double("op") ?: doc.outPoint
+        val split = atFrame.coerceIn(start + 1.0, end - 1.0)
+        if (split <= start || split >= end) return null
+        val copy = source.deepCopy() as JsonObj
+        val stretch = (source.double("sr") ?: 1.0).coerceAtLeast(0.01)
+        val sourceStartTime = source.double("st") ?: 0.0
+        edit("Split layer") {
+            source.putDouble("op", split)
+            copy.putDouble("ip", split)
+            copy.putDouble("op", end)
+            copy.putDouble("st", sourceStartTime + (split - start) * stretch)
+            copy.putInt("ind", Creator.nextIndex(layers))
+            copy.putString("nm", (source.string("nm") ?: "Layer") + " - 2")
+            layers.items.add(ref.index, copy)
+        }
+        val result = LayerRef(ref.scope, ref.index)
+        select(listOf(LayerTarget(result)))
+        return result
     }
 
     /**
