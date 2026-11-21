@@ -67,11 +67,24 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
                 state.act { edit("Add null") { val l = Creator.nullLayer(doc, doc.root.arr("layers"), "Null"); Creator.insertLayer(doc, null, l) } }
             }, Modifier.weight(1f))
         }
+        Text(tr("Objects & groups", "آبجکت‌ها و گروه‌ها"), color = StudioColors.TextMuted, fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AddTile(Ic.Link, tr("Linked Null", "Null متصل"), {
+                val children = state.session.selection.map { it.layer }.distinct()
+                if (children.isNotEmpty()) state.act { createNullParent(children) }
+                else state.message = tr("Select one or more layers first.", "ابتدا یک یا چند لایه را انتخاب کنید.")
+            }, Modifier.weight(1f))
+            AddTile(Ic.Group, tr("Empty Group", "گروه خالی"), {
+                state.act { addEmptyGroup(w, h) }; state.updatePanel(PanelTab.PROPERTIES)
+            }, Modifier.weight(1f))
+            AddTile(Ic.NullLayer, tr("Null", "لایهٔ Null"), {
+                state.act { edit("Add null") { val l = Creator.nullLayer(doc, doc.root.arr("layers"), "Null"); Creator.insertLayer(doc, null, l) } }
+            }, Modifier.weight(1f))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AddTile(Ic.Draw, tr("Draw", "نقاشی"), { state.tool = Tool.DRAW; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
             AddTile(Ic.Eraser, tr("Eraser", "پاک‌کن"), { state.tool = Tool.ERASE; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
             AddTile(Ic.Effects, tr("Effects", "افکت‌ها"), { state.updatePanel(PanelTab.EFFECTS) }, Modifier.weight(1f))
-            Box(Modifier.weight(1f))
         }
     }
 }
