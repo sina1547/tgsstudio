@@ -125,13 +125,11 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         val wide = maxWidth >= 700.dp && state.workspace == Workspace.ADVANCED && !state.previewMode
         val maxPanel = (maxHeight.value * 0.7f).coerceAtLeast(160f)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
-            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
-
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (wide) {
                     Row(Modifier.fillMaxSize()) {
@@ -150,6 +148,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 if (state.previewMode) IconBtn(Ic.Close, { state.previewMode = false; state.playing = false }, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99000000), RoundedCornerShape(12.dp)), tint = Color.White)
                 if (!state.previewMode) ContextBars(state, Modifier.align(Alignment.BottomCenter))
             }
+
+            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
 
             Ltr { PlaybackBar(state) }
 
