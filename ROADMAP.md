@@ -9,7 +9,7 @@ This project is being advanced incrementally without replacing its working docum
 - [ ] Stable release signing configuration (requires owner-controlled signing secrets)
 
 ## Timeline and animation
-- [ ] Multi-layer track overview with independent in/out ranges
+- [x] Root-layer track overview with independent in/out ranges (nested precomp track expansion remains pending)
 - [ ] Graph editor with editable Bezier velocity curves
 - [ ] Motion paths and spatial interpolation controls
 - [ ] Time remapping and camera layers
