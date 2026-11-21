@@ -23,8 +23,13 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,7 +71,7 @@ fun Logo(size: Dp) {
 @Composable
 fun GalleryScreen(
     store: ProjectStore, refresh: Int, setting: String,
-    onOpen: (ProjectInfo) -> Unit, onNew: (String) -> Unit, onImport: () -> Unit,
+    onOpen: (ProjectInfo) -> Unit, onNew: (String, Int, Int, Double, String) -> Unit, onImport: () -> Unit,
     onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onLanguage: (String) -> Unit,
     themeSetting: String, accent: String, onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit,
 ) {
@@ -144,9 +149,71 @@ fun GalleryScreen(
         }
     }
 
-    if (showNew) NameDialog(tr("New project", "پروژهٔ جدید"), tr("Untitled", "بدون‌نام"), { n -> showNew = false; onNew(n) }, { showNew = false })
+    if (showNew) NewProjectDialog({ showNew = false }) { n, w, h, fps, bg -> showNew = false; onNew(n, w, h, fps, bg) }
     renaming?.let { p -> NameDialog(tr("Rename", "تغییر نام"), p.name, { n -> onRename(p, n); renaming = null }, { renaming = null }) }
     deleting?.let { p -> ConfirmDialog(tr("Delete project?", "پروژه حذف شود؟"), tr("“${p.name}” will be removed from this phone.", "«${p.name}» از این گوشی پاک می‌شود."), tr("Delete", "حذف"), { onDelete(p); deleting = null }, { deleting = null }) }
     if (showSettings) SettingsDialog(setting, onLanguage, themeSetting, onThemeChange, accent, onAccentChange) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
+}
+
+@Composable
+private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int, Double, String) -> Unit) {
+    var name by remember { mutableStateOf(tr("Untitled", "بدون‌نام")) }
+    var preset by remember { mutableStateOf("9:16") }
+    var width by remember { mutableStateOf("1080") }
+    var height by remember { mutableStateOf("1920") }
+    var fps by remember { mutableStateOf("60") }
+    var background by remember { mutableStateOf("transparent") }
+    val presets = listOf(
+        "1:1" to (1080 to 1080), "4:3" to (1440 to 1080), "4:5" to (1080 to 1350),
+        "9:16" to (1080 to 1920), "16:9" to (1920 to 1080),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = StudioColors.Panel,
+        title = { Text(tr("New composition", "کامپوزیشن جدید"), color = StudioColors.TextPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text(tr("Project name", "نام پروژه")) }, modifier = Modifier.fillMaxWidth())
+                Text(tr("Aspect ratio", "نسبت تصویر"), color = StudioColors.TextMuted, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    presets.take(3).forEach { (label, size) ->
+                        SmallButton(label, { preset = label; width = size.first.toString(); height = size.second.toString() }, primary = preset == label)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    presets.drop(3).forEach { (label, size) ->
+                        SmallButton(label, { preset = label; width = size.first.toString(); height = size.second.toString() }, primary = preset == label)
+                    }
+                    SmallButton("Custom", { preset = "Custom" }, primary = preset == "Custom")
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(width, { width = it.filter(Char::isDigit); preset = "Custom" }, singleLine = true, label = { Text("Width") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(height, { height = it.filter(Char::isDigit); preset = "Custom" }, singleLine = true, label = { Text("Height") }, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(fps, { fps = it.filter { c -> c.isDigit() || c == '.' } }, singleLine = true, label = { Text(tr("Custom FPS (1–120)", "نرخ فریم دلخواه (۱ تا ۱۲۰)")) }, modifier = Modifier.fillMaxWidth())
+                Text(tr("Background", "پس‌زمینه"), color = StudioColors.TextMuted, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("transparent", "#000000", "#FFFFFF").forEach { color ->
+                        SmallButton(if (color == "transparent") tr("Transparent", "شفاف") else color, { background = color }, primary = background == color)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("#202124", "#101820", "#1B263B").forEach { color ->
+                        SmallButton(color, { background = color }, primary = background == color)
+                    }
+                }
+                Text(tr("Transparent is the default. TGS export remains transparent; a solid background is stored as composition metadata.", "شفافیت پیش‌فرض است. خروجی TGS همچنان شفاف می‌ماند؛ پس‌زمینهٔ رنگی به‌عنوان مشخصات کامپوزیشن ذخیره می‌شود."), color = StudioColors.TextMuted, fontSize = 11.sp)
+            }
+        },
+        confirmButton = {
+            TextButton({
+                val w = width.toIntOrNull()?.coerceIn(16, 4096) ?: 1080
+                val h = height.toIntOrNull()?.coerceIn(16, 4096) ?: 1920
+                val rate = fps.toDoubleOrNull()?.coerceIn(1.0, 120.0) ?: 60.0
+                onCreate(name.ifBlank { tr("Untitled", "بدون‌نام") }, w, h, rate, background)
+            }) { Text(tr("Create", "ساخت پروژه"), color = StudioColors.Accent) }
+        },
+        dismissButton = { TextButton(onDismiss) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
+    )
 }
