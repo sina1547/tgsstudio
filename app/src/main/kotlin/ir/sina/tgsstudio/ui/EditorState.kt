@@ -31,7 +31,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
 
     var tool by mutableStateOf(Tool.SELECT)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
-    var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else null)
+    var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else PanelTab.TIMELINE)
     var panelHeightDp by mutableFloatStateOf(prefs.panelHeightDp)
     var previewMode by mutableStateOf(false)
     var multiSelect by mutableStateOf(false)
