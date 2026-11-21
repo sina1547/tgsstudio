@@ -189,6 +189,20 @@ object TransformOps {
     }
 }
 
+data class GradientColorStop(val position: Double, val color: Rgba)
+
+data class GradientValues(
+    val radial: Boolean,
+    val startX: Double,
+    val startY: Double,
+    val endX: Double,
+    val endY: Double,
+    val stops: List<GradientColorStop>,
+) {
+    val startColor: Rgba get() = stops.firstOrNull()?.color ?: Rgba(0.12, 0.48, 1.0, 1.0)
+    val endColor: Rgba get() = stops.lastOrNull()?.color ?: Rgba(0.55, 0.25, 0.95, 1.0)
+}
+
 object StyleOps {
     fun firstOf(idx: DocIndex, t: Target, vararg kinds: ShapeKind): JsonObj? =
         Targets.styleItems(idx, t).firstOrNull { ShapeKind.fromCode(it.string("ty")) in kinds }
@@ -196,6 +210,66 @@ object StyleOps {
     fun fillColor(idx: DocIndex, t: Target, frame: Double): Rgba? = colorOf(firstOf(idx, t, ShapeKind.FILL), frame)
     fun strokeColor(idx: DocIndex, t: Target, frame: Double): Rgba? = colorOf(firstOf(idx, t, ShapeKind.STROKE), frame)
     fun strokeWidth(idx: DocIndex, t: Target, frame: Double): Double? = firstOf(idx, t, ShapeKind.STROKE)?.obj("w")?.let { PropEval.number(it, frame, 1.0) }
+
+    fun gradient(idx: DocIndex, t: Target, frame: Double): GradientValues? {
+        val item = firstOf(idx, t, ShapeKind.GRADIENT_FILL) ?: return null
+        val g = item.obj("g") ?: return null
+        val count = g.int("p") ?: return null
+        val values = PropEval.values(g.obj("k"), frame) ?: return null
+        val start = PropEval.values(item.obj("s"), frame) ?: return null
+        val end = PropEval.values(item.obj("e"), frame) ?: return null
+        if (count < 2 || values.size < count * 4 || start.size < 2 || end.size < 2) return null
+        val alphaStops = ArrayList<Pair<Double, Double>>()
+        var alphaIndex = count * 4
+        while (alphaIndex + 1 < values.size) {
+            alphaStops += values[alphaIndex] to values[alphaIndex + 1]
+            alphaIndex += 2
+        }
+        fun alphaAt(position: Double): Double {
+            if (alphaStops.isEmpty()) return 1.0
+            if (position <= alphaStops.first().first) return alphaStops.first().second
+            for (i in 1 until alphaStops.size) {
+                val (p1, a1) = alphaStops[i]
+                val (p0, a0) = alphaStops[i - 1]
+                if (position <= p1) return if (p1 > p0) a0 + (a1 - a0) * (position - p0) / (p1 - p0) else a1
+            }
+            return alphaStops.last().second
+        }
+        val colorStops = List(count) { i ->
+            val offset = i * 4
+            val position = values[offset]
+            GradientColorStop(position, Rgba(values[offset + 1], values[offset + 2], values[offset + 3], alphaAt(position)))
+        }
+        return GradientValues((item.int("t") ?: 1) == 2, start[0], start[1], end[0], end[1], colorStops)
+    }
+
+    fun ensureGradient(group: JsonObj): JsonObj? = ensure(group, "gf") { Creator.gradientFill() }
+
+    /** Writes every color and opacity stop in standard Lottie gradient format. */
+    fun setGradient(item: JsonObj, frame: Double, value: GradientValues) {
+        val g = item.obj("g") ?: return
+        val property = g.obj("k") ?: return
+        val colors = value.stops.sortedBy { it.position }.ifEmpty {
+            listOf(GradientColorStop(0.0, value.startColor), GradientColorStop(1.0, value.endColor))
+        }
+        g.putInt("p", colors.size)
+        val packed = ArrayList<Double>(colors.size * 6)
+        colors.forEach { stop ->
+            val p = stop.position.coerceIn(0.0, 1.0)
+            packed += p
+            packed += stop.color.r.coerceIn(0.0, 1.0)
+            packed += stop.color.g.coerceIn(0.0, 1.0)
+            packed += stop.color.b.coerceIn(0.0, 1.0)
+        }
+        colors.forEach { stop ->
+            packed += stop.position.coerceIn(0.0, 1.0)
+            packed += stop.color.a.coerceIn(0.0, 1.0)
+        }
+        PropWrite.setValues(property, frame, packed.toDoubleArray())
+        item.obj("s")?.let { PropWrite.setValues(it, frame, doubleArrayOf(value.startX, value.startY)) }
+        item.obj("e")?.let { PropWrite.setValues(it, frame, doubleArrayOf(value.endX, value.endY)) }
+        item.putInt("t", if (value.radial) 2 else 1)
+    }
 
     private fun colorOf(item: JsonObj?, frame: Double): Rgba? {
         val c = PropEval.values(item?.obj("c"), frame) ?: return null

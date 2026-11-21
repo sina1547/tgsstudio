@@ -32,6 +32,26 @@ class GeometryTest {
         near(2 * (80 + 40) + 2 * Math.PI * 10, c.length, 0.2)
     }
 
+    @Test fun roundedCornersModifierCutsSharpRectangleCorners() {
+        val sharp = Shapes.rect(0.0, 0.0, 100.0, 60.0, 0.0)
+        val rounded = sharp.rounded(10.0)
+        assertEquals(true, rounded.closed)
+        assertEquals(8, rounded.segments.size)
+        near(40.0, rounded.segments[0].x0, 0.5)
+        near(-30.0, rounded.segments[0].y0, 0.5)
+        assertTrue(rounded.length < sharp.length)
+    }
+
+    @Test fun roundedCornersClampToShortSegments() {
+        val line = Contour(listOf(
+            Cubic(0.0, 0.0, 0.0, 0.0, 5.0, 0.0, 5.0, 0.0),
+            Cubic(5.0, 0.0, 5.0, 0.0, 5.0, 5.0, 5.0, 5.0),
+        ), false)
+        val result = line.rounded(100.0)
+        assertEquals(false, result.closed)
+        assertTrue(result.segments.all { it.length.isFinite() })
+    }
+
     @Test fun bezierFromLottieVertices() {
         val b = Bezier(true, doubleArrayOf(0.0, 0.0, 10.0, 0.0, 10.0, 10.0), DoubleArray(6), DoubleArray(6))
         val c = b.toContour()

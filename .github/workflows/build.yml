@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'fix/**']
   pull_request:
   workflow_dispatch:
 
@@ -21,8 +21,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
+
       - name: Unit tests and debug APK
         run: gradle --no-daemon --stacktrace :document:test :parser:test :renderer:test :editor:test :export:test :app:assembleDebug
+
+      - name: rlottie conformance check (keyframes, trim paths, shapes)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libcairo2
+          python3 -m pip install -q rlottie-python numpy pillow cairosvg
+          python3 tools/rlottie_check.py export/build/rlottie-fixtures
+
+      - name: Rename APK with app version
+        run: |
+          mkdir -p app/build/outputs/apk/named
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -34,24 +47,55 @@ jobs:
             renderer/build/reports/tests
             editor/build/reports/tests
             export/build/reports/tests
-      - name: Upload APK
+
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tgs-studio-debug
-          path: app/build/outputs/apk/debug/*.apk
-      - name: Publish APK to Releases
+          name: TGSStudio-v0.3.0
+          path: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+
+      - name: Prepare release signing key
+        id: signing
+        if: github.event_name == 'push'
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tgsstudio-release.jks"
+            echo "store_file=$RUNNER_TEMP/tgsstudio-release.jks" >> "$GITHUB_OUTPUT"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets are not configured; signed APK will be skipped."
+          fi
+
+      - name: Build signed release APK
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          SIGNING_STORE_FILE: ${{ steps.signing.outputs.store_file }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Publish verified debug APK
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: TGS Studio build ${{ github.run_number }}
           prerelease: true
-          files: app/build/outputs/apk/debug/*.apk
-      - name: rlottie conformance check (keyframes, trim paths, shapes)
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq libcairo2
-          python3 -m pip install -q rlottie-python numpy pillow cairosvg
-          python3 tools/rlottie_check.py export/build/rlottie-fixtures
+          files: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+
+      - name: Attach signed release APK
+        if: github.event_name == 'push' && steps.signing.outputs.ready == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: TGS Studio build ${{ github.run_number }}
+          prerelease: true
+          files: app/build/outputs/apk/release/*.apk
+
       - name: Upload rlottie fixtures
         if: always()
         uses: actions/upload-artifact@v4

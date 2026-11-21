@@ -31,7 +31,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
 
     var tool by mutableStateOf(Tool.SELECT)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
-    var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else null)
+    var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else PanelTab.TIMELINE)
     var panelHeightDp by mutableFloatStateOf(prefs.panelHeightDp)
     var previewMode by mutableStateOf(false)
     var multiSelect by mutableStateOf(false)
@@ -63,9 +63,14 @@ class EditorState(val projectId: String, var projectName: String, val session: E
         viewFitted = true
     }
     fun zoomPan(centroid: Offset, zoom: Float, pan: Offset) {
+        // Keep the document canvas centered in the workspace; pinch changes scale only.
         val ns = (viewScale * zoom).coerceIn(0.1f, 40f)
         val k = ns / viewScale
-        viewOffset = Offset(centroid.x - (centroid.x - viewOffset.x) * k + pan.x, centroid.y - (centroid.y - viewOffset.y) * k + pan.y)
+        val center = Offset(fitSize.x / 2f, fitSize.y / 2f)
+        viewOffset = Offset(
+            center.x - (center.x - viewOffset.x) * k,
+            center.y - (center.y - viewOffset.y) * k,
+        )
         viewScale = ns
     }
     var fitSize by mutableStateOf(Offset.Zero)
@@ -73,6 +78,9 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     // pen tool and shape dragging
     var penPath by mutableStateOf<Bezier?>(null)
     var dragRect by mutableStateOf<Pair<Offset, Offset>?>(null)
+
+    var fontPath by mutableStateOf(prefs.importedFontPath)
+    fun persistImportedFontPath(path: String) { fontPath = path; prefs.importedFontPath = path }
 
     // freehand pen: settings, the stroke being drawn (document coordinates), and where the next write-on stroke starts
     var penColor by mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0))
@@ -91,7 +99,9 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var nodeIndex by mutableIntStateOf(-1)
 
     // timeline
-    var selectedKey by mutableStateOf<Pair<Int, Int>?>(null)   // (row, keyframe index)
+    var selectedKey by mutableStateOf<Pair<Int, Int>?>(null)   // focused (row, keyframe index)
+    var selectedKeys by mutableStateOf<Set<Pair<Int, Int>>>(emptySet())
+    var multiKeyframeMode by mutableStateOf(false)
     var copiedKeyframe by mutableStateOf<JsonObj?>(null)
     var timelinePxPerFrame by mutableFloatStateOf(6f)
 

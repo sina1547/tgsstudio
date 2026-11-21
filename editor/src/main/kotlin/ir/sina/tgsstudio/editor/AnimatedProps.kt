@@ -47,6 +47,12 @@ object AnimatedProps {
                 ShapeKind.STAR -> { add("position", "p", PropKind.VECTOR); add("points", "pt", PropKind.NUMBER); add("outer", "or", PropKind.NUMBER); add("inner", "ir", PropKind.NUMBER); add("r", "r", PropKind.NUMBER) }
                 ShapeKind.FILL -> { add("c", "c", PropKind.COLOR); add("o", "o", PropKind.NUMBER) }
                 ShapeKind.STROKE -> { add("c", "c", PropKind.COLOR); add("w", "w", PropKind.NUMBER); add("o", "o", PropKind.NUMBER) }
+                ShapeKind.GRADIENT_FILL, ShapeKind.GRADIENT_STROKE -> {
+                    o.obj("g")?.obj("k")?.takeIf { it.has("k") }?.let { out += PropEntry("gradient", owner, depth, it, PropKind.VECTOR) }
+                    add("start", "s", PropKind.VECTOR)
+                    add("end", "e", PropKind.VECTOR)
+                    add("o", "o", PropKind.NUMBER)
+                }
                 ShapeKind.TRIM -> { add("start", "s", PropKind.NUMBER); add("end", "e", PropKind.NUMBER); add("offset", "o", PropKind.NUMBER) }
                 else -> Unit
             }

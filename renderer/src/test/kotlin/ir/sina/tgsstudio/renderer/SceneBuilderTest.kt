@@ -86,6 +86,15 @@ class SceneBuilderTest {
         assertTrue("text layers" in SceneBuilder(doc("[$text]")).build(0.0).unsupported)
     }
 
+    @Test fun roundedCornersModifierChangesSceneGeometry() {
+        val rounded = """{"ty":"rd","r":${p("10")}}"""
+        val d = doc("[${shapeLayer(1, "L", ks(), group(rect, rounded, fill, tr))}]")
+        val scene = SceneBuilder(d).build(0.0)
+        val contour = scene.layers.single().items.single().contours.single()
+        assertTrue(contour.length < Shapes.rect(0.0, 0.0, 100.0, 100.0, 0.0).length)
+        assertTrue("rounded corners modifier" !in scene.unsupported)
+    }
+
     @Test fun trimAppliesToPathsAboveIt() {
         val line = """{"ty":"sh","ks":${p("""{"c":false,"i":[[0,0],[0,0]],"o":[[0,0],[0,0]],"v":[[0,0],[100,0]]}""")}}"""
         val trim = """{"ty":"tm","s":${p("0")},"e":${p("50")},"o":${p("0")},"m":1}"""

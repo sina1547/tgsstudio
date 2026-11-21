@@ -185,7 +185,10 @@ class SceneBuilder(private val doc: LottieDocument) {
                         topToBottom += listOf(PaintItem(paths, m, paint, strokeOf(raw, frame), false, prefix + idx))
                     }
                 }
-                ShapeKind.ROUNDED_CORNERS -> unsupported += "rounded corners modifier"
+                ShapeKind.ROUNDED_CORNERS -> {
+                    val radius = PropEval.number(raw.obj("r"), frame, 0.0)
+                    if (radius > 0.0) paths = paths.map { it.rounded(radius) }
+                }
                 ShapeKind.REPEATER -> unsupported += "repeater"
                 ShapeKind.MERGE -> unsupported += "merge paths"
                 ShapeKind.UNKNOWN -> unsupported += "shape type \"${item.typeCode}\""

@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,38 +76,67 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
     }
 }
 
-/** Text becomes vector strokes: the glyphs are rasterised, reduced to a centerline and added as stroked paths. */
+/** Text is shaped with the selected imported font, then converted to editable TGS vector paths. */
 @Composable
-fun TextDialog(state: EditorState, onDismiss: () -> Unit) {
+fun TextDialog(state: EditorState, onImportFont: () -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var bold by remember { mutableStateOf(false) }
+    var italic by remember { mutableStateOf(false) }
+    var filledOutline by remember { mutableStateOf(true) }
+    var lineSpacing by remember { mutableStateOf("1.0") }
+    var fontSize by remember { mutableStateOf("220") }
     var color by remember { mutableStateOf(Rgba(1.0, 1.0, 1.0, 1.0)) }
     var picking by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val noText = tr("Couldn't turn this text into strokes.", "نتوانستم این متن را به خط تبدیل کنم.")
+    val noText = tr("Couldn't turn this text into vectors.", "نتوانستم متن را به مسیر برداری تبدیل کنم.")
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { Text(tr("Add text", "افزودن متن"), color = StudioColors.TextPrimary) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(text, { text = it; error = null }, singleLine = true, label = { Text(tr("Text", "متن")) })
-                Text(tr("Added as a single hand-drawn style stroke (centerline of the letters), not a filled outline. TGS stickers can't contain live text.", "به‌صورت یک خط دست‌نویس (خط مرکزی حروف) اضافه می‌شود، نه تو‌پر. استیکر TGS متن زنده ندارد."), color = StudioColors.TextMuted, fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(text, { text = it; error = null }, minLines = 2, maxLines = 4, label = { Text(tr("Text", "متن")) }, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton(tr("Import TTF / OTF", "واردکردن فونت"), onImportFont)
+                    Text(state.fontPath?.substringAfterLast('/') ?: tr("System font", "فونت سیستم"), color = StudioColors.TextMuted, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(fontSize, { fontSize = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Size (px)", "اندازه (پیکسل)")) }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(lineSpacing, { lineSpacing = it.filter { ch -> ch.isDigit() || ch == '.' } }, singleLine = true, label = { Text(tr("Leading", "فاصله خطوط")) }, modifier = Modifier.weight(1f))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Swatch(color.toColor(), { picking = true })
                     SmallButton(tr("Bold", "ضخیم"), { bold = !bold }, primary = bold)
+                    SmallButton(tr("Italic", "مورب"), { italic = !italic }, primary = italic)
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton(tr("Filled outline", "حروف توپر"), { filledOutline = true }, primary = filledOutline)
+                    SmallButton(tr("Centerline", "خط مرکزی"), { filledOutline = false }, primary = !filledOutline)
+                }
+                Text(
+                    tr("The selected font is remembered between sessions. TGS has no live-text layer; text is converted to editable vector paths.", "فونت انتخاب‌شده بین اجراها حفظ می‌شود. TGS لایه متن زنده ندارد و متن به مسیر برداری قابل ویرایش تبدیل می‌شود."),
+                    color = StudioColors.TextMuted, fontSize = 12.sp,
+                )
                 error?.let { Text(it, color = StudioColors.Danger, fontSize = 12.sp) }
             }
         },
         confirmButton = {
             TextButton({
-                val mask = TextRaster.mask(text, 220f, bold)
-                val lines = mask?.let { Skeleton.centerline(it) }
-                if (mask == null || lines == null || lines.paths.isEmpty()) { error = noText }
-                else {
+                val px = fontSize.toFloatOrNull()?.coerceIn(12f, 600f) ?: 220f
+                val leading = lineSpacing.toFloatOrNull()?.coerceIn(0.8f, 2.5f) ?: 1f
+                val mask = TextRaster.mask(text, px, bold, state.fontPath, leading, italic)
+                if (mask == null) {
+                    error = noText
+                } else {
                     val scale = minOf(380.0 / mask.width, 200.0 / mask.height).coerceAtMost(1.0)
-                    state.act { addCenterlineText(lines, scale, color, text.take(24)) }
-                    state.updatePanel(PanelTab.PROPERTIES); onDismiss()
+                    val added = if (filledOutline) {
+                        val contours = TextRaster.outlines(mask)
+                        if (contours.isEmpty()) null else state.act { addOutlinedText(contours, scale, color, text.lineSequence().first().take(24)) }
+                    } else {
+                        val lines = Skeleton.centerline(mask)
+                        if (lines.paths.isEmpty()) null else state.act { addCenterlineText(lines, scale, color, text.lineSequence().first().take(24)) }
+                    }
+                    if (added == null) error = noText
+                    else { state.updatePanel(PanelTab.PROPERTIES); onDismiss() }
                 }
             }) { Text(tr("Add", "افزودن"), color = StudioColors.Accent) }
         },

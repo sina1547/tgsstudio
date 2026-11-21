@@ -1,5 +1,8 @@
 package ir.sina.tgsstudio.ui
 
+import android.app.Activity
+import android.content.ContextWrapper
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +56,27 @@ import kotlin.math.max
 @Composable
 fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: () -> Unit) {
     val context = LocalContext.current
-    SideEffect { state.isFa = lang == Lang.FA }
+    val activity = remember(context) {
+        generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<Activity>()
+            .firstOrNull()
+    }
+    val decorView = activity?.window?.decorView
+    val immersiveFlags = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+        View.SYSTEM_UI_FLAG_FULLSCREEN or
+        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+        View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+    DisposableEffect(decorView) {
+        val previousFlags = decorView?.systemUiVisibility ?: 0
+        decorView?.systemUiVisibility = immersiveFlags
+        onDispose { decorView?.systemUiVisibility = previousFlags }
+    }
+    SideEffect {
+        state.isFa = lang == Lang.FA
+        decorView?.systemUiVisibility = immersiveFlags
+    }
     val doc = state.session.doc
     var showExport by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
@@ -79,6 +102,25 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
             Toast.makeText(context, if (ok) (if (lang == Lang.FA) "خروجی ذخیره شد" else "Exported") else (if (lang == Lang.FA) "خروجی ناموفق بود" else "Export failed"), Toast.LENGTH_SHORT).show()
         }
     }
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            var target: java.io.File? = null
+            runCatching {
+                val fontsDir = java.io.File(context.filesDir, "fonts").apply { mkdirs() }
+                val pickedName = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':').orEmpty()
+                val ext = pickedName.substringAfterLast('.', "ttf").lowercase().takeIf { it == "ttf" || it == "otf" } ?: "ttf"
+                target = java.io.File(fontsDir, "custom-font-" + System.currentTimeMillis() + "." + ext)
+                context.contentResolver.openInputStream(uri)?.use { input -> target!!.outputStream().use(input::copyTo) } ?: error("no font stream")
+                android.graphics.Typeface.createFromFile(target!!)
+                state.persistImportedFontPath(target!!.absolutePath)
+                state.message = if (lang == Lang.FA) "فونت وارد شد و ذخیره شد" else "Font imported and saved"
+            }.onFailure {
+                target?.delete()
+                state.message = (if (lang == Lang.FA) "وارد کردن فونت ناموفق بود: " else "Font import failed: ") + (it.message ?: "")
+            }
+        }
+    }
+
     val svgPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -125,22 +167,20 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         val wide = maxWidth >= 700.dp && state.workspace == Workspace.ADVANCED && !state.previewMode
         val maxPanel = (maxHeight.value * 0.7f).coerceAtLeast(160f)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
-            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
-
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (wide) {
                     Row(Modifier.fillMaxSize()) {
-                        Column(Modifier.width(250.dp).fillMaxSize().background(StudioColors.Panel)) { LayersPanel(state) }
+                        Column(Modifier.width(244.dp).fillMaxSize().background(StudioColors.Panel)) { LayersPanel(state) }
                         Column(Modifier.weight(1f).fillMaxSize()) {
                             Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state) }
-                            Column(Modifier.height(190.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
+                            Column(Modifier.height(216.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
                         }
-                        Column(Modifier.width(290.dp).fillMaxSize().background(StudioColors.Panel)) { PropertiesPanel(state) }
+                        Column(Modifier.width(284.dp).fillMaxSize().background(StudioColors.Panel)) { PropertiesPanel(state) }
                     }
                 } else CanvasArea(state)
 
@@ -169,11 +209,12 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 }
             }
             if (!state.previewMode && !wide) Dock(state)
+            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
         }
     }
 
     if (showExport) ExportDialog(doc, { kind -> pendingKind = kind; exportLauncher.launch("${state.projectName}.${kind.ext}") }, { showExport = false })
-    if (showText) TextDialog(state) { showText = false }
+    if (showText) TextDialog(state, { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/octet-stream")) }) { showText = false }
     if (showRename) NameDialog(tr("Project name", "نام پروژه"), state.projectName, { n -> state.projectName = n; store.rename(state.projectId, n); doc.name = n; showRename = false; state.changed() }, { showRename = false })
     if (showLeave) ConfirmDialog(
         tr("Unsaved changes", "تغییرات ذخیره‌نشده"), tr("Save your changes before leaving?", "قبل از خروج تغییرات ذخیره شود؟"), tr("Save", "ذخیره"),
@@ -189,18 +230,31 @@ private fun CanvasArea(state: EditorState) {
 @Composable
 private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit) {
     val tick = state.tick
-    Row(Modifier.fillMaxWidth().height(52.dp).background(StudioColors.Panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().height(52.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         IconBtn(Ic.Back, onBack, size = 40.dp)
-        Row(Modifier.weight(1f).clickable(onClick = onRename).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(state.projectName, color = StudioColors.TextPrimary, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-            if (state.dirty) Box(Modifier.padding(start = 6.dp)) { Dot(StudioColors.Warning, 8.dp) }
+        Column(
+            Modifier.weight(1f).clickable(onClick = onRename).padding(start = 7.dp, end = 4.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(state.projectName, color = StudioColors.TextPrimary, fontSize = 14.sp, maxLines = 1)
+                if (state.dirty) Dot(StudioColors.Warning, 7.dp)
+            }
+            Text(
+                "TGS  ·  ${state.session.doc.width} × ${state.session.doc.height}  ·  ${fmt(state.session.doc.frameRate, 0)} FPS",
+                color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1,
+            )
         }
-        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 40.dp)
-        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 40.dp)
-        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 40.dp)
-        IconBtn(Ic.Export, onExport, size = 40.dp)
+        Box(Modifier.width(1.dp).height(28.dp).background(StudioColors.Divider))
+        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 38.dp, iconSize = 19.dp)
+        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 38.dp, iconSize = 19.dp)
+        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 38.dp, iconSize = 19.dp)
+        IconBtn(Ic.Export, onExport, size = 38.dp, iconSize = 19.dp, tint = StudioColors.Accent)
         Box {
-            IconBtn(Ic.More, onMore, size = 40.dp)
+            IconBtn(Ic.More, onMore, size = 38.dp)
             DropdownMenu(menuOpen, onMenuClose, containerColor = StudioColors.PanelRaised) {
                 DropdownMenuItem(text = { Text(tr("Preview", "پیش‌نمایش"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); onPreview() })
                 DropdownMenuItem(text = { Text(tr("Rename project", "تغییر نام پروژه"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); onRename() })
@@ -213,16 +267,36 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 @Composable
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
     val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
-    Row(Modifier.fillMaxWidth().background(StudioColors.Background).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        tools.forEach { (t, ic) -> IconBtn(ic, { state.tool = t; if (t != Tool.PEN) state.penPath = null; state.changed() }, active = state.tool == t, size = 42.dp) }
-        IconBtn(Ic.Text, onText, size = 42.dp)
-        IconBtn(Ic.Svg, onSvg, size = 42.dp)
-        Box(Modifier.width(1.dp).height(24.dp).background(StudioColors.Divider))
-        IconBtn(Ic.Fit, { state.fit(state.fitSize.x, state.fitSize.y) }, size = 42.dp)
-        Text("${(state.viewScale / (minOf(state.fitSize.x / state.session.doc.width, state.fitSize.y / state.session.doc.height).coerceAtLeast(0.0001f) * 0.92f) * 100).toInt()}%", color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp))
-        Box(Modifier.width(1.dp).height(24.dp).background(StudioColors.Divider))
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Row(
+            Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 3.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            tools.forEach { (t, ic) ->
+                IconBtn(ic, { state.tool = t; if (t != Tool.PEN) state.penPath = null; state.changed() }, active = state.tool == t, size = 40.dp, iconSize = 20.dp)
+            }
+        }
+        Row(
+            Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 3.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBtn(Ic.Text, onText, size = 40.dp, iconSize = 20.dp)
+            IconBtn(Ic.Svg, onSvg, size = 40.dp, iconSize = 20.dp)
+            IconBtn(Ic.Fit, { state.fit(state.fitSize.x, state.fitSize.y) }, size = 40.dp, iconSize = 20.dp)
+        }
+        Text(
+            "${(state.viewScale / (minOf(state.fitSize.x / state.session.doc.width, state.fitSize.y / state.session.doc.height).coerceAtLeast(0.0001f) * 0.92f) * 100).toInt()}%",
+            color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp),
+        )
+        Box(Modifier.width(1.dp).height(28.dp).background(StudioColors.Divider))
         listOf(Workspace.DESIGN to tr("Design", "طراحی"), Workspace.ANIMATION to tr("Animation", "انیمیشن"), Workspace.ADVANCED to tr("Advanced", "پیشرفته")).forEach { (w, label) ->
-            SmallButton(label, { state.setWorkspaceMode(w) }, primary = state.workspace == w, modifier = Modifier.padding(horizontal = 2.dp))
+            SmallButton(label, { state.setWorkspaceMode(w) }, primary = state.workspace == w, modifier = Modifier.padding(horizontal = 1.dp))
         }
     }
 }
@@ -282,18 +356,28 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
 private fun PlaybackBar(state: EditorState) {
     val doc = state.session.doc
     val lo = doc.inPoint.toFloat(); val hi = max(lo + 1f, (doc.outPoint - 1).toFloat())
-    Row(Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 40.dp, iconSize = 20.dp)
-        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 40.dp, iconSize = 20.dp)
-        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 40.dp, iconSize = 20.dp)
-        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 40.dp, iconSize = 20.dp)
+    Row(
+        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 38.dp, iconSize = 19.dp)
+        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 40.dp, iconSize = 19.dp)
+        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 38.dp, iconSize = 19.dp)
+        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 38.dp, iconSize = 18.dp)
         Slider(
             value = state.frame.toFloat().coerceIn(lo, hi), onValueChange = { state.playing = false; state.seek(Math.rint(it.toDouble())) }, valueRange = lo..hi,
             colors = SliderDefaults.colors(thumbColor = StudioColors.Accent, activeTrackColor = StudioColors.Accent, inactiveTrackColor = StudioColors.PanelHigh),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
         )
-        Text("${state.frame.toInt()}/${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp))
-        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } })
+        Column(
+            Modifier.clip(RoundedCornerShape(9.dp)).background(StudioColors.PanelHigh).padding(horizontal = 8.dp, vertical = 5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 12.sp)
+            Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 9.sp)
+        }
+        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 3.dp))
     }
 }
 
@@ -311,15 +395,21 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 @Composable
 private fun Dock(state: EditorState) {
     val items = listOf(PanelTab.LAYERS to (Ic.Layers to tr("Layers", "لایه‌ها")), PanelTab.PROPERTIES to (Ic.Props to tr("Properties", "ویژگی‌ها")), PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")), PanelTab.ADD to (Ic.Add to tr("Add", "افزودن")))
-    Row(Modifier.fillMaxWidth().height(58.dp).background(StudioColors.Panel), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Panel).padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
         items.forEach { (tab, pair) ->
             val active = state.panel == tab
             Column(
-                Modifier.weight(1f).fillMaxSize().clickable { state.updatePanel(if (state.panel == tab) null else tab) },
+                Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
+                    .background(if (active) StudioColors.AccentSoft else Color.Transparent)
+                    .clickable { state.updatePanel(if (state.panel == tab) null else tab) },
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
-                Icon(pair.first, if (active) StudioColors.Accent else StudioColors.TextMuted, 22.dp)
-                Text(pair.second, color = if (active) StudioColors.Accent else StudioColors.TextMuted, fontSize = 11.sp)
+                Icon(pair.first, if (active) StudioColors.Accent else StudioColors.TextMuted, 21.dp)
+                Text(pair.second, color = if (active) StudioColors.Accent else StudioColors.TextMuted, fontSize = 10.sp)
             }
         }
     }
