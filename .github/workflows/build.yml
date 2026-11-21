@@ -31,6 +31,11 @@ jobs:
           python3 -m pip install -q rlottie-python numpy pillow cairosvg
           python3 tools/rlottie_check.py export/build/rlottie-fixtures
 
+      - name: Rename APK with app version
+        run: |
+          mkdir -p app/build/outputs/apk/named
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,8 +51,8 @@ jobs:
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tgs-studio-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: TGSStudio-v0.3.0
+          path: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
 
       - name: Prepare release signing key
         id: signing
@@ -80,7 +85,7 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: TGS Studio build ${{ github.run_number }}
           prerelease: true
-          files: app/build/outputs/apk/debug/*.apk
+          files: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
 
       - name: Attach signed release APK
         if: github.event_name == 'push' && steps.signing.outputs.ready == 'true'
