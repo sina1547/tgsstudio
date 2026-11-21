@@ -2,6 +2,7 @@ package ir.sina.tgsstudio.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
@@ -36,6 +37,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sina.tgsstudio.document.LayerRef
+import ir.sina.tgsstudio.editor.LayerTarget
 import ir.sina.tgsstudio.editor.Easing
 import ir.sina.tgsstudio.editor.Interp
 import ir.sina.tgsstudio.editor.KeyframeOps
@@ -60,6 +63,7 @@ fun TimelinePanel(state: EditorState) {
     val totalFrames = (doc.outPoint - doc.inPoint).coerceAtLeast(1.0)
     val contentWidthDp = (totalFrames * ppf / density).toFloat().dp + 40.dp
     val hScroll = rememberScrollState()
+    var layerTracksVisible by remember { mutableStateOf(true) }
 
     Ltr {
         Column(Modifier.fillMaxWidth()) {
@@ -69,10 +73,15 @@ fun TimelinePanel(state: EditorState) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Ic.Timeline, StudioColors.Accent, 20.dp)
                 Text(tr("Timeline", "تایم‌لاین"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                SmallButton(tr("Layer tracks", "ترک لایه‌ها"), { layerTracksVisible = !layerTracksVisible }, primary = layerTracksVisible)
                 IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 36.dp, iconSize = 18.dp)
                 IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 36.dp, iconSize = 18.dp)
             }
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
+
+            if (layerTracksVisible && doc.layers.isNotEmpty()) {
+                LayerTrackOverview(state, contentWidthDp, hScroll)
+            }
 
             if (target == null || rows.isEmpty()) {
                 Text(tr("Select a layer or shape to see its animatable properties.", "یک لایه یا شکل را انتخاب کنید تا ویژگی‌های قابل انیمیشنش را ببینید."), color = StudioColors.TextMuted, modifier = Modifier.padding(16.dp))
@@ -88,6 +97,72 @@ fun TimelinePanel(state: EditorState) {
                 Box(Modifier.weight(1f).horizontalScroll(hScroll)) {
                     TimelineCanvas(state, rows, scope, contentWidthDp)
                 }
+            }
+        }
+    }
+}
+
+
+/** Root-composition layer overview. Each bar represents the layer's independent in/out range. */
+@Composable
+private fun LayerTrackOverview(
+    state: EditorState,
+    widthDp: androidx.compose.ui.unit.Dp,
+    scroll: androidx.compose.foundation.ScrollState,
+) {
+    val layers = state.session.doc.layers
+    val doc = state.session.doc
+    val density = LocalDensity.current.density
+    val ppf = state.timelinePxPerFrame
+    val rowHeight = 30.dp
+    val rowPx = rowHeight.value * density
+    val frame = state.frame
+    val tick = state.tick
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp)) {
+        Column(Modifier.width(LABEL_W)) {
+            Box(Modifier.height(24.dp), contentAlignment = Alignment.CenterStart) {
+                Text(tr("Layer tracks", "ترک لایه‌ها"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+            }
+            layers.forEachIndexed { index, layer ->
+                Box(Modifier.fillMaxWidth().height(rowHeight).padding(start = 8.dp, end = 4.dp), contentAlignment = Alignment.CenterStart) {
+                    val name = layer.name.ifBlank { "Layer ${layer.index ?: index}" }
+                    Text(name, color = StudioColors.TextPrimary, fontSize = 11.sp, maxLines = 1)
+                }
+            }
+        }
+        Box(Modifier.weight(1f).horizontalScroll(scroll)) {
+            Canvas(
+                Modifier.width(widthDp).height(24.dp + rowHeight * layers.size).background(StudioColors.Panel)
+                    .pointerInput(tick, ppf, layers.size) {
+                        detectTapGestures { position ->
+                            val row = ((position.y - 24f * density) / rowPx).toInt()
+                            if (row in layers.indices) {
+                                val ref = LayerRef(null, row)
+                                state.act { select(listOf(LayerTarget(ref))) }
+                                state.playing = false
+                                state.seek((doc.inPoint + position.x / ppf).coerceIn(doc.inPoint, doc.outPoint - 1.0))
+                            }
+                        }
+                    },
+            ) {
+                val ruler = 24f * density
+                drawLine(StudioColors.Divider, Offset(0f, ruler), Offset(size.width, ruler), 1f)
+                layers.forEachIndexed { index, layer ->
+                    val top = ruler + index * rowPx
+                    val selected = state.session.selection.contains(LayerTarget(LayerRef(null, index)))
+                    val start = ((layer.inPoint - doc.inPoint) * ppf).toFloat().coerceAtLeast(0f)
+                    val end = ((layer.outPoint - doc.inPoint) * ppf).toFloat().coerceAtMost(size.width)
+                    val barWidth = (end - start).coerceAtLeast(3f)
+                    drawRoundRect(
+                        color = if (selected) StudioColors.Accent else StudioColors.Violet.copy(alpha = 0.62f),
+                        topLeft = Offset(start, top + rowPx * 0.22f),
+                        size = Size(barWidth, rowPx * 0.56f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f * density),
+                    )
+                    drawLine(StudioColors.Divider, Offset(0f, top + rowPx), Offset(size.width, top + rowPx), 1f)
+                }
+                val px = ((frame - doc.inPoint) * ppf).toFloat()
+                drawLine(StudioColors.Warning, Offset(px, 0f), Offset(px, size.height), 1.5f * density)
             }
         }
     }
