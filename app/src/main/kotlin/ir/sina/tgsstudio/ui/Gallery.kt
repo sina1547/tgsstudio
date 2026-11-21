@@ -158,7 +158,8 @@ fun GalleryScreen(
 
 @Composable
 private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int, Double, String) -> Unit) {
-    var name by remember { mutableStateOf(tr("Untitled", "بدون‌نام")) }
+    val defaultName = tr("Untitled", "بدون‌نام")
+    var name by remember { mutableStateOf(defaultName) }
     var preset by remember { mutableStateOf("9:16") }
     var width by remember { mutableStateOf("1080") }
     var height by remember { mutableStateOf("1920") }
@@ -211,7 +212,7 @@ private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int,
                 val w = width.toIntOrNull()?.coerceIn(16, 4096) ?: 1080
                 val h = height.toIntOrNull()?.coerceIn(16, 4096) ?: 1920
                 val rate = fps.toDoubleOrNull()?.coerceIn(1.0, 120.0) ?: 60.0
-                onCreate(name.ifBlank { tr("Untitled", "بدون‌نام") }, w, h, rate, background)
+                onCreate(name.ifBlank { defaultName }, w, h, rate, background)
             }) { Text(tr("Create", "ساخت پروژه"), color = StudioColors.Accent) }
         },
         dismissButton = { TextButton(onDismiss) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
