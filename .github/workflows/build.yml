@@ -22,6 +22,21 @@ jobs:
         with:
           gradle-version: 8.9
 
+      # app/build.gradle.kts is the single source of truth for app versioning.
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -n 1)"
+          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ]; then
+            echo "Could not read versionName/versionCode from app/build.gradle.kts" >&2
+            exit 1
+          fi
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Building TGS Studio v$VERSION_NAME (versionCode $VERSION_CODE)"
+
       - name: Unit tests and debug APK
         run: gradle --no-daemon --stacktrace :document:test :parser:test :renderer:test :editor:test :export:test :app:assembleDebug
 
@@ -32,9 +47,11 @@ jobs:
           python3 tools/rlottie_check.py export/build/rlottie-fixtures
 
       - name: Rename APK with app version
+        env:
+          VERSION_NAME: ${{ steps.app_version.outputs.version_name }}
         run: |
           mkdir -p app/build/outputs/apk/named
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/named/TGSStudio_v${VERSION_NAME}.apk"
 
       - name: Upload test reports
         if: always()
@@ -48,25 +65,29 @@ jobs:
             editor/build/reports/tests
             export/build/reports/tests
 
-      - name: Upload debug APK artifact
+      - name: Upload versioned debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TGSStudio-v0.3.0
-          path: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+          name: TGSStudio-v${{ steps.app_version.outputs.version_name }}-debug
+          path: app/build/outputs/apk/named/TGSStudio_v${{ steps.app_version.outputs.version_name }}.apk
 
+      # Release signing is enabled only when every required secret exists.
       - name: Prepare release signing key
         id: signing
         if: github.event_name == 'push'
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ] && [ -n "$SIGNING_STORE_PASSWORD" ] && [ -n "$SIGNING_KEY_ALIAS" ] && [ -n "$SIGNING_KEY_PASSWORD" ]; then
             echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tgsstudio-release.jks"
             echo "store_file=$RUNNER_TEMP/tgsstudio-release.jks" >> "$GITHUB_OUTPUT"
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Release signing secrets are not configured; signed APK will be skipped."
+            echo "Release signing skipped: one or more signing secrets are not configured."
           fi
 
       - name: Build signed release APK
@@ -78,23 +99,40 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: gradle --no-daemon --stacktrace :app:assembleRelease
 
+      - name: Rename signed release APK
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          VERSION_NAME: ${{ steps.app_version.outputs.version_name }}
+        run: |
+          mkdir -p app/build/outputs/apk/named
+          RELEASE_APK="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          test -n "$RELEASE_APK"
+          cp "$RELEASE_APK" "app/build/outputs/apk/named/TGSStudio_v${VERSION_NAME}_signed.apk"
+
+      - name: Upload signed release APK artifact
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TGSStudio-v${{ steps.app_version.outputs.version_name }}-signed
+          path: app/build/outputs/apk/named/TGSStudio_v${{ steps.app_version.outputs.version_name }}_signed.apk
+
       - name: Publish verified debug APK
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: TGS Studio build ${{ github.run_number }}
+          name: TGS Studio build ${{ github.run_number }} (v${{ steps.app_version.outputs.version_name }})
           prerelease: true
-          files: app/build/outputs/apk/named/TGSStudio_v0.3.0.apk
+          files: app/build/outputs/apk/named/TGSStudio_v${{ steps.app_version.outputs.version_name }}.apk
 
       - name: Attach signed release APK
         if: github.event_name == 'push' && steps.signing.outputs.ready == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: TGS Studio build ${{ github.run_number }}
+          name: TGS Studio build ${{ github.run_number }} (v${{ steps.app_version.outputs.version_name }})
           prerelease: true
-          files: app/build/outputs/apk/release/*.apk
+          files: app/build/outputs/apk/named/TGSStudio_v${{ steps.app_version.outputs.version_name }}_signed.apk
 
       - name: Upload rlottie fixtures
         if: always()
