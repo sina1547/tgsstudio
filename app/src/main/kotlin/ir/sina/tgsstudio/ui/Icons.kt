@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 enum class Ic {
     Back, Play, Pause, Prev, Next, Loop, Eye, EyeOff, Lock, Unlock, Undo, Redo, Save, Export, More, Preview,
     Select, Hand, Pen, Node, Rect, Ellipse, Star, Polygon, Text, Svg, Layers, Props, Timeline, Add,
-    Close, Plus, Minus, Trash, Copy, Group, Ungroup, Up, Down, Check, Diamond, Folder, Shape, NullLayer, Precomp, Fit,
+    Close, Plus, Minus, Trash, Copy, Group, Ungroup, Up, Down, Check, Diamond, Folder, Shape, NullLayer, Precomp, Fit, Split,
     Chevron, ChevronDown, Settings, Info, Path, Key, Link, Draw, Eraser, Effects,
 }
 
@@ -78,6 +78,7 @@ private fun DrawScope.drawIcon(ic: Ic, c: Color, u: Float) {
         Ic.Close -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
         Ic.Plus -> { line(12f, 5f, 12f, 19f); line(5f, 12f, 19f, 12f) }
         Ic.Minus -> line(5f, 12f, 19f, 12f)
+        Ic.Split -> { line(5f, 6f, 19f, 6f); line(5f, 18f, 19f, 18f); line(12f, 3f, 12f, 9f); line(12f, 15f, 12f, 21f); line(9f, 12f, 15f, 12f) }
         Ic.Trash -> { line(4f, 7f, 20f, 7f); path({ m(6f, 7f); l(7f, 20f); l(17f, 20f); l(18f, 7f) }); path({ m(9f, 7f); l(9f, 4f); l(15f, 4f); l(15f, 7f) }) }
         Ic.Copy -> { rect(8f, 8f, 12f, 12f); path({ m(16f, 8f); l(16f, 4f); l(4f, 4f); l(4f, 16f); l(8f, 16f) }) }
         Ic.Group -> { rect(3f, 3f, 9f, 9f); rect(12f, 12f, 9f, 9f) }
