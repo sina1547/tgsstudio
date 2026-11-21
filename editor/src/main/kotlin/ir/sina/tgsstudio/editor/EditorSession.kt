@@ -174,7 +174,6 @@ class EditorSession(val doc: LottieDocument) {
         val split = atFrame.coerceIn(start + 1.0, end - 1.0)
         if (split <= start || split >= end) return null
         val copy = source.deepCopy() as JsonObj
-        val stretch = (source.double("sr") ?: 1.0).coerceAtLeast(0.01)
         edit("Split layer") {
             source.putDouble("op", split)
             copy.putDouble("ip", split)
