@@ -78,6 +78,13 @@ fun TimelinePanel(state: EditorState) {
                 IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 34.dp, iconSize = 17.dp)
                 NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(76.dp), decimals = 0, label = "F")
                 IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
+                val selectedLayer = target as? LayerTarget
+                IconBtn(Ic.Split, {
+                    selectedLayer?.let { layer ->
+                        val result = state.act { splitLayer(layer.layer, state.frame) }
+                        if (result == null) state.message = tr("Move the playhead inside the selected layer.", "نشانگر زمان را داخل لایهٔ انتخاب‌شده قرار دهید.")
+                    }
+                }, enabled = selectedLayer != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
                 val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
                 IconBtn(Ic.Add, {
                     val ri = activeRow
