@@ -1,5 +1,8 @@
 package ir.sina.tgsstudio.ui
 
+import android.app.Activity
+import android.content.ContextWrapper
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +57,28 @@ import kotlin.math.max
 @Composable
 fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: () -> Unit) {
     val context = LocalContext.current
-    SideEffect { state.isFa = lang == Lang.FA }
+    val hostView = LocalView.current
+    val activity = remember(context) {
+        generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<Activity>()
+            .firstOrNull()
+    }
+    val decorView = activity?.window?.decorView
+    val immersiveFlags = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+        View.SYSTEM_UI_FLAG_FULLSCREEN or
+        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+        View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+    DisposableEffect(decorView) {
+        val previousFlags = decorView?.systemUiVisibility ?: 0
+        decorView?.systemUiVisibility = immersiveFlags
+        onDispose { decorView?.systemUiVisibility = previousFlags }
+    }
+    SideEffect {
+        state.isFa = lang == Lang.FA
+        decorView?.systemUiVisibility = immersiveFlags
+    }
     val doc = state.session.doc
     var showExport by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
@@ -144,7 +169,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         val wide = maxWidth >= 700.dp && state.workspace == Workspace.ADVANCED && !state.previewMode
         val maxPanel = (maxHeight.value * 0.7f).coerceAtLeast(160f)
         Column(Modifier.fillMaxSize()) {
@@ -209,7 +234,7 @@ private fun CanvasArea(state: EditorState) {
 private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit) {
     val tick = state.tick
     Row(
-        Modifier.fillMaxWidth().height(60.dp).background(StudioColors.Panel).padding(horizontal = 6.dp),
+        Modifier.fillMaxWidth().height(52.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBtn(Ic.Back, onBack, size = 40.dp)
@@ -246,8 +271,8 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
     val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
     Row(
-        Modifier.fillMaxWidth().background(StudioColors.Background).horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().height(44.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
@@ -335,7 +360,7 @@ private fun PlaybackBar(state: EditorState) {
     val doc = state.session.doc
     val lo = doc.inPoint.toFloat(); val hi = max(lo + 1f, (doc.outPoint - 1).toFloat())
     Row(
-        Modifier.fillMaxWidth().height(56.dp).background(StudioColors.Panel).padding(horizontal = 7.dp),
+        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
