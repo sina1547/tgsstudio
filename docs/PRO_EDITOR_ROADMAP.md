@@ -80,6 +80,9 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
+Version 0.9.8 consolidates access to the existing editing workspaces in a persistent five-item dock: Tools, Layers, Properties, Timeline and Effects. Each item opens the actual editor panel and reflects its active state. This is a workflow/UI integration pass, not a claim that the remaining roadmap features (boolean paths, repeaters, full graph channels, pre-compose, advanced masks, media import/export) are complete.
+
+
 Version 0.8.0 moves the existing vector and drawing tools into a left-side collapsible drawer with a dedicated tools icon, categorized selection/path/shape/drawing/import sections, and keeps text, SVG import, canvas fit and workspace switching accessible there. The drawer reuses the existing functional tool implementations; it does not claim new boolean-path or offset-path algorithms. The current branch includes composition-level layer tracks, additive timeline layer selection, draggable layer In/Out edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping and direct frame entry, playhead keyframe insertion, editable work area and frame-rate controls, per-layer In/Out/Start/Stretch editing, a first-pass two-stop linear/radial gradient fill editor, and basic Add-mode masks from top-level paths. Version 0.7.0 adds a color-picker eyedropper that samples the fully composited current-frame scene off-screen using the same scene drawing code as the canvas; sampled colors are applied to the active fill, stroke, or gradient stop and committed as one undoable operation. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
