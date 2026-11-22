@@ -131,8 +131,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("no stream")
                 state.act { addSvg(text) }
             }.onSuccess { r ->
-                state.rightPanelTab = PanelTab.PROPERTIES
-                state.rightPanelOpen = true
+                state.openRightPanel(PanelTab.PROPERTIES)
                 state.message = when {
                     r == null || r.groups.isEmpty() -> if (lang == Lang.FA) "شکل برداری در این SVG پیدا نشد." else "No vector shapes found in this SVG."
                     r.skipped.isNotEmpty() -> (if (lang == Lang.FA) "وارد شد. پشتیبانی‌نشده: " else "Imported. Not supported: ") + r.skipped.joinToString()
@@ -234,9 +233,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     val centerY = doc.height / 2.0
     fun finishAdd() {
         state.tool = Tool.SELECT
-        state.rightPanelTab = PanelTab.PROPERTIES
-        state.rightPanelOpen = true
-        state.toolsDrawerOpen = false
+        state.openRightPanel(PanelTab.PROPERTIES)
     }
     fun addObject(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) {
         state.act(block)
