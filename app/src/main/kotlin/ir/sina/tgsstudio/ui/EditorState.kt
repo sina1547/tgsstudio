@@ -16,7 +16,7 @@ import ir.sina.tgsstudio.editor.Target
 
 enum class Tool { SELECT, HAND, PEN, NODE, RECT, ELLIPSE, STAR, POLYGON, DRAW, ERASE }
 enum class Workspace { DESIGN, ANIMATION, ADVANCED }
-enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, ADD, EFFECTS }
+enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, EFFECTS }
 
 /**
  * UI state of one open project. The document itself lives in [session] (pure Kotlin); this class only
@@ -30,6 +30,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     inline fun <T> act(block: EditorSession.() -> T): T { val r = session.block(); changed(); return r }
 
     var tool by mutableStateOf(Tool.SELECT)
+    var toolsDrawerOpen by mutableStateOf(false)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
     var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else PanelTab.TIMELINE)
     var panelHeightDp by mutableFloatStateOf(prefs.panelHeightDp)

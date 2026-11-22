@@ -51,6 +51,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import ir.sina.tgsstudio.data.ProjectStore
 import ir.sina.tgsstudio.editor.PathOps
+import ir.sina.tgsstudio.editor.Creator
 import ir.sina.tgsstudio.export.Exporter
 import kotlinx.coroutines.delay
 import kotlin.math.max
@@ -195,7 +196,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 
             Ltr { PlaybackBar(state) }
 
-            if (!state.previewMode && state.panel != null && (!wide || state.panel == PanelTab.ADD || state.panel == PanelTab.EFFECTS)) {
+            if (!state.previewMode && state.panel != null && (!wide || state.panel == PanelTab.EFFECTS)) {
                 Column(Modifier.fillMaxWidth().height(state.panelHeightDp.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(StudioColors.Panel)) {
                     PanelHandle(state, maxPanel)
                     Box(Modifier.weight(1f)) {
@@ -203,7 +204,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                             PanelTab.LAYERS -> LayersPanel(state)
                             PanelTab.PROPERTIES -> PropertiesPanel(state)
                             PanelTab.TIMELINE -> TimelinePanel(state)
-                            PanelTab.ADD -> AddPanel(state, { svgPicker.launch(arrayOf("*/*")) }, { showText = true })
                             PanelTab.EFFECTS -> EffectsPanel(state)
                             null -> Unit
                         }
@@ -225,12 +225,42 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 
 @Composable
 private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
-    var toolsOpen by remember { mutableStateOf(false) }
+    val toolsOpen = state.toolsDrawerOpen
+    val doc = state.session.doc
+    val centerX = doc.width / 2.0
+    val centerY = doc.height / 2.0
+    fun finishAdd() {
+        state.tool = Tool.SELECT
+        state.updatePanel(PanelTab.PROPERTIES)
+        state.toolsDrawerOpen = false
+    }
+    fun addObject(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) {
+        state.act(block)
+        finishAdd()
+    }
+    fun addNull() {
+        state.act {
+            edit("Add null") {
+                val layer = Creator.nullLayer(doc, doc.root.arr("layers"), "Null")
+                Creator.insertLayer(doc, null, layer)
+            }
+        }
+        finishAdd()
+    }
+    fun addLinkedNull() {
+        val children = state.session.selection.map { it.layer }.distinct()
+        if (children.isEmpty()) {
+            state.message = if (state.isFa) "ابتدا یک یا چند لایه را انتخاب کنید." else "Select one or more layers first."
+        } else {
+            state.act { createNullParent(children) }
+            finishAdd()
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         EditorCanvas(state)
         Column(
             Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
-                .width(if (toolsOpen) 184.dp else 48.dp)
+                .width(if (toolsOpen) 214.dp else 48.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
@@ -240,10 +270,10 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Ic.Tools, StudioColors.Accent, 19.dp)
                     Text(tr("Tools", "ابزارها"), color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
-                    IconBtn(Ic.Chevron, { toolsOpen = false }, size = 36.dp, iconSize = 18.dp)
+                    IconBtn(Ic.Chevron, { state.toolsDrawerOpen = false }, size = 36.dp, iconSize = 18.dp)
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
-                Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
                     ToolGroupLabel(tr("Selection", "انتخاب"))
                     ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { toolsOpen = false })
                     ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { toolsOpen = false })
@@ -258,9 +288,22 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupLabel(tr("Drawing", "طراحی آزاد"))
                     ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { toolsOpen = false })
                     ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { toolsOpen = false })
+                    ToolGroupLabel(tr("Quick add", "افزودن سریع"))
+                    ToolDrawerAction(Ic.Rect, tr("Add rectangle", "افزودن مستطیل")) { addObject { addRect(centerX, centerY, 220.0, 160.0) } }
+                    ToolDrawerAction(Ic.Ellipse, tr("Add ellipse", "افزودن بیضی")) { addObject { addEllipse(centerX, centerY, 200.0, 200.0) } }
+                    ToolDrawerAction(Ic.Star, tr("Add star", "افزودن ستاره")) { addObject { addStar(centerX, centerY, 110.0) } }
+                    ToolDrawerAction(Ic.Polygon, tr("Add polygon", "افزودن چندضلعی")) { addObject { addPolygon(centerX, centerY, 110.0) } }
+                    ToolGroupLabel(tr("Objects & groups", "آبجکت‌ها و گروه‌ها"))
+                    ToolDrawerAction(Ic.NullLayer, tr("Null layer", "لایهٔ Null"), ::addNull)
+                    ToolDrawerAction(Ic.Link, tr("Linked Null", "Null متصل"), ::addLinkedNull)
+                    ToolDrawerAction(Ic.Group, tr("Empty Group", "گروه خالی")) { addObject { addEmptyGroup(centerX, centerY) } }
                     ToolGroupLabel(tr("Create & import", "ساخت و ورود"))
                     ToolDrawerAction(Ic.Text, tr("Text", "متن"), onText)
                     ToolDrawerAction(Ic.Svg, tr("Import SVG", "ورود SVG"), onSvg)
+                    ToolDrawerAction(Ic.Effects, tr("Effects", "افکت‌ها")) {
+                        state.updatePanel(PanelTab.EFFECTS)
+                        state.toolsDrawerOpen = false
+                    }
                     ToolDrawerAction(Ic.Fit, tr("Fit canvas", "برازش بوم")) { state.fit(state.fitSize.x, state.fitSize.y) }
                     Text(
                         "${(state.viewScale / (minOf(state.fitSize.x / state.session.doc.width, state.fitSize.y / state.session.doc.height).coerceAtLeast(0.0001f) * 0.92f) * 100).toInt()}%",
@@ -273,7 +316,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     }
                 }
             } else {
-                IconBtn(Ic.Tools, { toolsOpen = true }, active = true, size = 38.dp, iconSize = 21.dp)
+                IconBtn(Ic.Tools, { state.toolsDrawerOpen = true }, active = true, size = 38.dp, iconSize = 21.dp)
             }
         }
     }
@@ -486,7 +529,7 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 
 @Composable
 private fun Dock(state: EditorState) {
-    val items = listOf(PanelTab.LAYERS to (Ic.Layers to tr("Layers", "لایه‌ها")), PanelTab.PROPERTIES to (Ic.Props to tr("Properties", "ویژگی‌ها")), PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")), PanelTab.ADD to (Ic.Add to tr("Add", "افزودن")))
+    val items = listOf(PanelTab.LAYERS to (Ic.Layers to tr("Layers", "لایه‌ها")), PanelTab.PROPERTIES to (Ic.Props to tr("Properties", "ویژگی‌ها")), PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")))
     Row(
         Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Panel).padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
