@@ -337,7 +337,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     session.addFreeform(PathOps.setClosed(cur, true)); state.penPath = null; state.tool = Tool.SELECT; state.changed(); mode = Mode.NONE
                 } else { state.penPath = PathOps.append(cur, startDoc.x.toDouble(), startDoc.y.toDouble()); mode = Mode.PEN }
             }
-            Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
+            Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
             Tool.DRAW -> { mode = Mode.DRAW; state.drawPoints = listOf(startDoc) }
             Tool.ERASE -> {
                 mode = Mode.ERASE; session.beginGesture("Erase")
@@ -463,6 +463,7 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
     val cx = ((p0.x + p1.x) / 2).toDouble(); val cy = ((p0.y + p1.y) / 2).toDouble()
     state.act {
         when (tool) {
+            Tool.LINE -> addFreeform(Bezier(false, doubleArrayOf(p0.x.toDouble(), p0.y.toDouble(), p1.x.toDouble(), p1.y.toDouble()), DoubleArray(4), DoubleArray(4)), filled = false)
             Tool.RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
             Tool.ELLIPSE -> addEllipse(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
             Tool.STAR -> addStar(cx, cy, max(w, h) / 2)
