@@ -72,9 +72,15 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 - [ ] Instrumented device tests for import → edit → save/reopen → playback → export.
 - [ ] Stable signing/update path, versioned APK releases and regression suite.
 
+## M7 — Vector tool workspace
+- [x] Move drawing and vector tools into a left-side collapsible tool drawer with a dedicated tools icon.
+- [x] Group the existing working Select, Hand, Bezier Pen, Node Editor, primitive-shape, freehand and stroke-eraser tools by workflow.
+- [x] Keep text creation, SVG import, canvas fit and workspace switching accessible from the drawer.
+- [ ] Add further Illustrator-class path operations (boolean geometry, join/split, offset path and precision snapping) only with model, renderer, undo/redo and export support.
+
 ## Current increment
 
-The current branch includes composition-level layer tracks, additive timeline layer selection, draggable layer In/Out edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping and direct frame entry, playhead keyframe insertion, editable work area and frame-rate controls, per-layer In/Out/Start/Stretch editing, a first-pass two-stop linear/radial gradient fill editor, and basic Add-mode masks from top-level paths. Version 0.7.0 adds a color-picker eyedropper that samples the fully composited current-frame scene off-screen using the same scene drawing code as the canvas; sampled colors are applied to the active fill, stroke, or gradient stop and committed as one undoable operation. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+Version 0.8.0 moves the existing vector and drawing tools into a left-side collapsible drawer with a dedicated tools icon, categorized selection/path/shape/drawing/import sections, and keeps text, SVG import, canvas fit and workspace switching accessible there. The drawer reuses the existing functional tool implementations; it does not claim new boolean-path or offset-path algorithms. The current branch includes composition-level layer tracks, additive timeline layer selection, draggable layer In/Out edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping and direct frame entry, playhead keyframe insertion, editable work area and frame-rate controls, per-layer In/Out/Start/Stretch editing, a first-pass two-stop linear/radial gradient fill editor, and basic Add-mode masks from top-level paths. Version 0.7.0 adds a color-picker eyedropper that samples the fully composited current-frame scene off-screen using the same scene drawing code as the canvas; sampled colors are applied to the active fill, stroke, or gradient stop and committed as one undoable operation. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 

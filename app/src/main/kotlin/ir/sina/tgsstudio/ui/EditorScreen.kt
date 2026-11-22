@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -177,7 +179,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     Row(Modifier.fillMaxSize()) {
                         Column(Modifier.width(244.dp).fillMaxSize().background(StudioColors.Panel)) { LayersPanel(state) }
                         Column(Modifier.weight(1f).fillMaxSize()) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state) }
+                            Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
                             Column(Modifier.height(216.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
                         }
                         Column(Modifier.width(284.dp).fillMaxSize().background(StudioColors.Panel)) { PropertiesPanel(state) }
@@ -209,7 +211,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 }
             }
             if (!state.previewMode && !wide) Dock(state)
-            if (!state.previewMode) Ltr { ToolBar(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
         }
     }
 
@@ -223,8 +224,99 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 }
 
 @Composable
-private fun CanvasArea(state: EditorState) {
-    Box(Modifier.fillMaxSize()) { EditorCanvas(state) }
+private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
+    var toolsOpen by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        EditorCanvas(state)
+        Column(
+            Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
+                .width(if (toolsOpen) 184.dp else 48.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(StudioColors.Panel.copy(alpha = 0.97f))
+                .padding(5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (toolsOpen) {
+                Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Ic.Tools, StudioColors.Accent, 19.dp)
+                    Text(tr("Tools", "ابزارها"), color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                    IconBtn(Ic.Chevron, { toolsOpen = false }, size = 36.dp, iconSize = 18.dp)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
+                Column(Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                    ToolGroupLabel(tr("Selection", "انتخاب"))
+                    ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { toolsOpen = false })
+                    ToolGroupLabel(tr("Paths", "مسیرها"))
+                    ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { toolsOpen = false })
+                    ToolGroupLabel(tr("Vector shapes", "اشکال برداری"))
+                    ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { toolsOpen = false })
+                    ToolGroupLabel(tr("Drawing", "طراحی آزاد"))
+                    ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { toolsOpen = false })
+                    ToolGroupLabel(tr("Create & import", "ساخت و ورود"))
+                    ToolDrawerAction(Ic.Text, tr("Text", "متن"), onText)
+                    ToolDrawerAction(Ic.Svg, tr("Import SVG", "ورود SVG"), onSvg)
+                    ToolDrawerAction(Ic.Fit, tr("Fit canvas", "برازش بوم")) { state.fit(state.fitSize.x, state.fitSize.y) }
+                    Text(
+                        "${(state.viewScale / (minOf(state.fitSize.x / state.session.doc.width, state.fitSize.y / state.session.doc.height).coerceAtLeast(0.0001f) * 0.92f) * 100).toInt()}%",
+                        color = StudioColors.TextMuted, fontSize = 11.sp,
+                        modifier = Modifier.align(Alignment.End).padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                    ToolGroupLabel(tr("Workspace", "محیط کاری"))
+                    listOf(Workspace.DESIGN to tr("Design", "طراحی"), Workspace.ANIMATION to tr("Animation", "انیمیشن"), Workspace.ADVANCED to tr("Advanced", "پیشرفته")).forEach { (w, label) ->
+                        SmallButton(label, { state.setWorkspaceMode(w); toolsOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
+                    }
+                }
+            } else {
+                IconBtn(Ic.Tools, { toolsOpen = true }, active = true, size = 38.dp, iconSize = 21.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolGroupLabel(label: String) {
+    Text(label, color = StudioColors.TextMuted, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(start = 9.dp, top = 10.dp, bottom = 3.dp))
+}
+
+@Composable
+private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: String, close: () -> Unit) {
+    val active = state.tool == tool
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 1.dp).clip(RoundedCornerShape(9.dp))
+            .background(if (active) StudioColors.AccentSoft else Color.Transparent)
+            .clickable {
+                state.tool = tool
+                if (tool != Tool.PEN) state.penPath = null
+                state.changed()
+                close()
+            }.padding(horizontal = 7.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, if (active) StudioColors.Accent else StudioColors.TextPrimary, 19.dp)
+        Text(label, color = if (active) StudioColors.Accent else StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.padding(start = 9.dp))
+        if (active) {
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            Icon(Ic.Check, StudioColors.Accent, 15.dp)
+        }
+    }
+}
+
+@Composable
+private fun ToolDrawerAction(icon: Ic, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 1.dp).clip(RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick).padding(horizontal = 7.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, StudioColors.TextPrimary, 19.dp)
+        Text(label, color = StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.padding(start = 9.dp))
+    }
 }
 
 @Composable
