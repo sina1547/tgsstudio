@@ -43,19 +43,28 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
             .onFailure { toast("پروژه باز نشد", "Couldn't open this project") }
     }
 
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        try {
-            val doc = context.contentResolver.openInputStream(uri)?.use { TgsCodec.read(it) } ?: error("no stream")
-            val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                ?.substringBeforeLast('.') ?: "Imported"
-            doc.name = name
-            open(store.create(doc, name))
-        } catch (e: DocumentException) {
-            toast("این فایل TGS یا Lottie معتبر نیست: ${e.message}", "Not a valid TGS/Lottie file: ${e.message}")
-        } catch (e: Exception) {
-            toast("فایل خوانده نشد", "Couldn't read the file")
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        var imported = 0
+        var first: ProjectInfo? = null
+        var failed = 0
+        uris.forEach { uri ->
+            runCatching {
+                val doc = context.contentResolver.openInputStream(uri)?.use { TgsCodec.read(it) } ?: error("no stream")
+                val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Imported"
+                doc.name = name
+                store.create(doc, name)
+            }.onSuccess { info ->
+                if (first == null) first = info
+                imported++
+            }.onFailure { failed++ }
         }
+        refresh++
+        first?.let(::open)
+        if (failed > 0) toast("$imported فایل وارد شد؛ $failed فایل نامعتبر بود", "$imported imported; $failed file(s) could not be opened")
+        else toast("$imported فایل وارد شد", "$imported file(s) imported")
     }
 
     WithLanguage(lang) {
@@ -65,7 +74,7 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
                 store, refresh, setting,
                 onOpen = ::open,
                 onNew = { name, width, height, fps, background -> val doc = Creator.blankDocument(name, width, height, fps, background); open(store.create(doc, name)) },
-                onImport = { importer.launch(arrayOf("*/*")) },
+                onImport = { importer.launch(arrayOf("application/json", "application/gzip", "application/octet-stream", "*/*")) },
                 onRename = { p, n -> store.rename(p.id, n); refresh++ },
                 onDelete = { p -> store.delete(p.id); refresh++ },
                 onLanguage = { s -> prefs.languageSetting = s; setting = s },
