@@ -390,7 +390,7 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                                 val ev = awaitPointerEvent()
                                 val ch = ev.changes.first()
                                 if (ch.changedToUp()) { ch.consume(); break }
-                                val step = Math.rint((ch.position.x - lastX) / ppf)
+                                val step = Math.rint((ch.position.x - lastX).toDouble() / ppf.toDouble())
                                 lastX = ch.position.x
                                 if (step != 0.0) {
                                     val allowed = clampKeyframeGroupDelta(
