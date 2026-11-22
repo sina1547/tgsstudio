@@ -182,7 +182,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
 
     Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
         Text(tr("Composition layers", "لایه‌های کامپوزیشن"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
-        Row(Modifier.fillMaxWidth().height((24 + 32 * layers.size).dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(max = 148.dp).verticalScroll(rememberScrollState())) {
             Column(Modifier.width(LABEL_W)) {
                 Box(Modifier.height(24.dp))
                 layers.forEachIndexed { index, layer ->
