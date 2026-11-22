@@ -356,6 +356,16 @@ private fun PathSection(state: EditorState, t: Target) {
                 SmallButton(tr("Edit nodes", "ویرایش نقاط"), { state.tool = Tool.NODE; state.changed() }, primary = true, ic = Ic.Node)
                 SmallButton(if (b?.closed == true) tr("Open", "باز کردن") else tr("Close", "بستن"), { if (b != null) { state.act { edit("Open/close path") { writePath(ref, PathOps.setClosed(b, !b.closed)) } } } })
             }
+            SmallButton(
+                tr("Reverse direction", "معکوس‌کردن جهت مسیر"),
+                {
+                    val changed = state.act { structuralPathEdit(ref, "Reverse path direction") { PathOps.reverse(it) } }
+                    if (changed) state.nodeIndex = -1
+                },
+                modifier = Modifier.padding(top = 6.dp),
+                enabled = (b?.count ?: 0) >= 2,
+                ic = Ic.Path,
+            )
             val n = state.nodeIndex
             if (b != null && n in 0 until b.count) {
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
