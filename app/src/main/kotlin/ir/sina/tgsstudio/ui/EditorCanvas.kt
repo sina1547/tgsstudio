@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -116,7 +117,7 @@ private fun DrawScope.drawCanvasRulers(state: EditorState, docW: Float, docH: Fl
         val sx = tl.x + x * state.viewScale
         if (sx >= tl.x && sx <= br.x) {
             drawLine(StudioColors.TextMuted, Offset(sx, tl.y - 7f * density), Offset(sx, tl.y), 1f * density)
-            if ((x / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(x.toInt().toString(), sx + 2f * density, tl.y - 8f * density, textPaint(density))
+            if ((x / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(x.toInt().toString(), sx + 2f * density, tl.y - 8f * density, rulerTextPaint(density))
         }
         x += step
     }
@@ -125,10 +126,16 @@ private fun DrawScope.drawCanvasRulers(state: EditorState, docW: Float, docH: Fl
         val sy = tl.y + y * state.viewScale
         if (sy >= tl.y && sy <= br.y) {
             drawLine(StudioColors.TextMuted, Offset(tl.x - 7f * density, sy), Offset(tl.x, sy), 1f * density)
-            if ((y / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(y.toInt().toString(), maxOf(0f, tl.x - 17f * density), sy - 2f * density, textPaint(density))
+            if ((y / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(y.toInt().toString(), maxOf(0f, tl.x - 17f * density), sy - 2f * density, rulerTextPaint(density))
         }
         y += step
     }
+}
+
+private fun rulerTextPaint(density: Float) = android.graphics.Paint().apply {
+    color = android.graphics.Color.LTGRAY
+    textSize = 9f * density
+    isAntiAlias = true
 }
 
 // ------------------------------------------------------------------------------------------------------
