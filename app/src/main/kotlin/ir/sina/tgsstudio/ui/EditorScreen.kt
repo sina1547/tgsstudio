@@ -691,22 +691,28 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 
 @Composable
 private fun Dock(state: EditorState) {
-    val items = listOf(PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")))
+    data class DockItem(val icon: Ic, val label: String, val active: Boolean, val action: () -> Unit)
+    val items = listOf(
+        DockItem(Ic.Tools, tr("Tools", "ابزارها"), state.toolsDrawerOpen, { state.openToolsDrawer() }),
+        DockItem(Ic.Layers, tr("Layers", "لایه‌ها"), state.rightPanelOpen && state.rightPanelTab == PanelTab.LAYERS, { state.openRightPanel(PanelTab.LAYERS) }),
+        DockItem(Ic.Props, tr("Properties", "ویژگی‌ها"), state.rightPanelOpen && state.rightPanelTab == PanelTab.PROPERTIES, { state.openRightPanel(PanelTab.PROPERTIES) }),
+        DockItem(Ic.Timeline, tr("Timeline", "تایم‌لاین"), state.panel == PanelTab.TIMELINE, { state.updatePanel(if (state.panel == PanelTab.TIMELINE) null else PanelTab.TIMELINE) }),
+        DockItem(Ic.Effects, tr("Effects", "افکت‌ها"), state.panel == PanelTab.EFFECTS, { state.updatePanel(if (state.panel == PanelTab.EFFECTS) null else PanelTab.EFFECTS) }),
+    )
     Row(
-        Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Panel).padding(horizontal = 8.dp, vertical = 5.dp),
+        Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Panel).padding(horizontal = 5.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        items.forEach { (tab, pair) ->
-            val active = state.panel == tab
+        items.forEach { item ->
             Column(
-                Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
-                    .background(if (active) StudioColors.AccentSoft else Color.Transparent)
-                    .clickable { state.updatePanel(if (state.panel == tab) null else tab) },
+                Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(10.dp))
+                    .background(if (item.active) StudioColors.AccentSoft else Color.Transparent)
+                    .clickable(onClick = item.action),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
-                Icon(pair.first, if (active) StudioColors.Accent else StudioColors.TextMuted, 21.dp)
-                Text(pair.second, color = if (active) StudioColors.Accent else StudioColors.TextMuted, fontSize = 10.sp)
+                Icon(item.icon, if (item.active) StudioColors.Accent else StudioColors.TextMuted, 20.dp)
+                Text(item.label, color = if (item.active) StudioColors.Accent else StudioColors.TextMuted, fontSize = 9.sp, maxLines = 1)
             }
         }
     }
