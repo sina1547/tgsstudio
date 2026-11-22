@@ -31,6 +31,8 @@ class EditorState(val projectId: String, var projectName: String, val session: E
 
     var tool by mutableStateOf(Tool.SELECT)
     var toolsDrawerOpen by mutableStateOf(false)
+    var rightPanelOpen by mutableStateOf(false)
+    var rightPanelTab by mutableStateOf(PanelTab.LAYERS)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
     var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else PanelTab.TIMELINE)
     var panelHeightDp by mutableFloatStateOf(prefs.panelHeightDp)
@@ -117,6 +119,16 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     fun savePanelHeight() { prefs.panelHeightDp = panelHeightDp }
     fun setWorkspaceMode(w: Workspace) {
         workspace = w; prefs.workspace = w.name.lowercase()
-        when (w) { Workspace.DESIGN -> updatePanel(PanelTab.LAYERS); Workspace.ANIMATION -> updatePanel(PanelTab.TIMELINE); Workspace.ADVANCED -> updatePanel(panel ?: PanelTab.LAYERS) }
+        when (w) {
+            Workspace.DESIGN -> { rightPanelTab = PanelTab.LAYERS; rightPanelOpen = true; updatePanel(null) }
+            Workspace.ANIMATION -> updatePanel(PanelTab.TIMELINE)
+            Workspace.ADVANCED -> {
+                if (panel == PanelTab.LAYERS || panel == PanelTab.PROPERTIES) {
+                    rightPanelTab = panel!!
+                    updatePanel(null)
+                }
+                rightPanelOpen = true
+            }
+        }
     }
 }

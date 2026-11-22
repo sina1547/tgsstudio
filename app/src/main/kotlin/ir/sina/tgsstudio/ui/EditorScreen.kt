@@ -130,7 +130,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("no stream")
                 state.act { addSvg(text) }
             }.onSuccess { r ->
-                state.updatePanel(PanelTab.PROPERTIES)
+                state.rightPanelTab = PanelTab.PROPERTIES
+                state.rightPanelOpen = true
                 state.message = when {
                     r == null || r.groups.isEmpty() -> if (lang == Lang.FA) "شکل برداری در این SVG پیدا نشد." else "No vector shapes found in this SVG."
                     r.skipped.isNotEmpty() -> (if (lang == Lang.FA) "وارد شد. پشتیبانی‌نشده: " else "Imported. Not supported: ") + r.skipped.joinToString()
@@ -163,6 +164,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         when {
             state.previewMode -> { state.previewMode = false; state.playing = false }
             state.penPath != null -> { state.penPath = null; state.changed() }
+            state.rightPanelOpen -> state.rightPanelOpen = false
             state.panel != null -> state.updatePanel(null)
             state.tool != Tool.SELECT -> { state.tool = Tool.SELECT; state.changed() }
             state.dirty -> showLeave = true
@@ -177,13 +179,9 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (wide) {
-                    Row(Modifier.fillMaxSize()) {
-                        Column(Modifier.width(244.dp).fillMaxSize().background(StudioColors.Panel)) { LayersPanel(state) }
-                        Column(Modifier.weight(1f).fillMaxSize()) {
-                            Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
-                            Column(Modifier.height(216.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
-                        }
-                        Column(Modifier.width(284.dp).fillMaxSize().background(StudioColors.Panel)) { PropertiesPanel(state) }
+                    Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
+                        Column(Modifier.height(216.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
                     }
                 } else CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) })
 
@@ -196,7 +194,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 
             Ltr { PlaybackBar(state) }
 
-            if (!state.previewMode && state.panel != null && (!wide || state.panel == PanelTab.EFFECTS)) {
+            if (!state.previewMode && state.panel != null && state.panel != PanelTab.LAYERS && state.panel != PanelTab.PROPERTIES && (!wide || state.panel == PanelTab.EFFECTS)) {
                 Column(Modifier.fillMaxWidth().height(state.panelHeightDp.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(StudioColors.Panel)) {
                     PanelHandle(state, maxPanel)
                     Box(Modifier.weight(1f)) {
@@ -231,7 +229,8 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     val centerY = doc.height / 2.0
     fun finishAdd() {
         state.tool = Tool.SELECT
-        state.updatePanel(PanelTab.PROPERTIES)
+        state.rightPanelTab = PanelTab.PROPERTIES
+        state.rightPanelOpen = true
         state.toolsDrawerOpen = false
     }
     fun addObject(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) {
@@ -317,6 +316,38 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 }
             } else {
                 IconBtn(Ic.Tools, { state.toolsDrawerOpen = true }, active = true, size = 38.dp, iconSize = 21.dp)
+            }
+        }
+
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
+                .width(if (state.rightPanelOpen) 276.dp else 46.dp)
+                .then(if (state.rightPanelOpen) Modifier.fillMaxHeight(0.82f).heightIn(max = 620.dp) else Modifier.heightIn(min = 96.dp, max = 180.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(StudioColors.Panel.copy(alpha = 0.97f))
+                .padding(5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (state.rightPanelOpen) {
+                Row(Modifier.fillMaxWidth().padding(start = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (state.rightPanelTab == PanelTab.LAYERS) Ic.Layers else Ic.Props, StudioColors.Accent, 19.dp)
+                    Text(
+                        if (state.rightPanelTab == PanelTab.LAYERS) tr("Layers", "لایه‌ها") else tr("Properties", "ویژگی‌ها"),
+                        color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    )
+                    IconBtn(Ic.Chevron, { state.rightPanelOpen = false }, size = 36.dp, iconSize = 18.dp)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    IconBtn(Ic.Layers, { state.rightPanelTab = PanelTab.LAYERS }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 19.dp)
+                    IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 19.dp)
+                }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (state.rightPanelTab == PanelTab.LAYERS) LayersPanel(state) else PropertiesPanel(state)
+                }
+            } else {
+                IconBtn(Ic.Layers, { state.rightPanelTab = PanelTab.LAYERS; state.rightPanelOpen = true }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 21.dp)
+                IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES; state.rightPanelOpen = true }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
             }
         }
     }
@@ -480,7 +511,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Copy, { state.act { duplicateSelection() } }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Up, { sel.singleOrNull()?.let { t -> state.act { move(t, -1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Down, { sel.singleOrNull()?.let { t -> state.act { move(t, 1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
-                IconBtn(Ic.Props, { state.updatePanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
+                IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES; state.rightPanelOpen = true }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
@@ -529,7 +560,7 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 
 @Composable
 private fun Dock(state: EditorState) {
-    val items = listOf(PanelTab.LAYERS to (Ic.Layers to tr("Layers", "لایه‌ها")), PanelTab.PROPERTIES to (Ic.Props to tr("Properties", "ویژگی‌ها")), PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")))
+    val items = listOf(PanelTab.TIMELINE to (Ic.Timeline to tr("Timeline", "تایم‌لاین")))
     Row(
         Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Panel).padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
