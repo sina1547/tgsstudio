@@ -14,7 +14,7 @@ import ir.sina.tgsstudio.renderer.Bezier
 import ir.sina.tgsstudio.renderer.Rgba
 import ir.sina.tgsstudio.editor.Target
 
-enum class Tool { SELECT, HAND, PEN, NODE, RECT, ELLIPSE, STAR, POLYGON, DRAW, ERASE }
+enum class Tool { SELECT, HAND, PEN, NODE, LINE, RECT, ELLIPSE, STAR, POLYGON, DRAW, ERASE }
 enum class Workspace { DESIGN, ANIMATION, ADVANCED }
 enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, EFFECTS }
 
