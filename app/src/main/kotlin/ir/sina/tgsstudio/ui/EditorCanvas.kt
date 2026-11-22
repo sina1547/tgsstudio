@@ -417,7 +417,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                         session.writePath(ref, nb); state.changed()
                     }
                 }
-                Mode.SHAPE -> state.dragRect = startDoc to doc
+                Mode.SHAPE -> state.dragRect = shapeBounds(state, startDoc, doc)
                 Mode.DRAW -> {
                     val prev = state.drawPoints.lastOrNull()
                     if (prev == null || hypot((doc.x - prev.x).toDouble(), (doc.y - prev.y).toDouble()) * state.viewScale >= 1.5) state.drawPoints = state.drawPoints + doc
@@ -442,11 +442,25 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
     }
 }
 
+private fun shapeBounds(state: EditorState, a: Offset, b: Offset): Pair<Offset, Offset> {
+    var dx = b.x - a.x
+    var dy = b.y - a.y
+    if (state.constrainShape) {
+        val side = max(kotlin.math.abs(dx), kotlin.math.abs(dy))
+        dx = kotlin.math.sign(dx) * side
+        dy = kotlin.math.sign(dy) * side
+    }
+    return if (state.drawFromCenter) {
+        Offset(a.x - dx, a.y - dy) to Offset(a.x + dx, a.y + dy)
+    } else a to Offset(a.x + dx, a.y + dy)
+}
+
 private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
     state.dragRect = null
-    val w = kotlin.math.abs(b.x - a.x).toDouble(); val h = kotlin.math.abs(b.y - a.y).toDouble()
+    val (p0, p1) = shapeBounds(state, a, b)
+    val w = kotlin.math.abs(p1.x - p0.x).toDouble(); val h = kotlin.math.abs(p1.y - p0.y).toDouble()
     if (max(w, h) < 8.0) return
-    val cx = ((a.x + b.x) / 2).toDouble(); val cy = ((a.y + b.y) / 2).toDouble()
+    val cx = ((p0.x + p1.x) / 2).toDouble(); val cy = ((p0.y + p1.y) / 2).toDouble()
     state.act {
         when (tool) {
             Tool.RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
