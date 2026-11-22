@@ -301,6 +301,26 @@ private fun AppearanceSection(state: EditorState, t: Target) {
                 state.changed()
             },
             onDone = { state.session.endGesture(); picking = null; state.changed() },
+            onEyedropper = {
+                state.eyedropperCallback = { sampled ->
+                    if (!state.session.history.isGestureOpen) state.session.beginGesture("Eyedropper color")
+                    when (which) {
+                        "fill" -> state.session.setFillColor(t, sampled)
+                        "stroke" -> state.session.setStrokeColor(t, sampled)
+                        "gradientStart" -> gradient?.let { state.session.setGradient(t, it.copy(stops = it.stops.mapIndexed { i, stop -> if (i == 0) stop.copy(color = sampled) else stop })) }
+                        "gradientEnd" -> gradient?.let { state.session.setGradient(t, it.copy(stops = it.stops.mapIndexed { i, stop -> if (i == it.stops.lastIndex) stop.copy(color = sampled) else stop })) }
+                        else -> if (which.startsWith("gradientStop:")) {
+                            val stopIndex = which.substringAfter(":").toIntOrNull() ?: -1
+                            gradient?.let { g -> if (stopIndex in g.stops.indices) state.session.setGradient(t, g.copy(stops = g.stops.mapIndexed { i, stop -> if (i == stopIndex) stop.copy(color = sampled) else stop })) }
+                        }
+                    }
+                    state.session.endGesture()
+                    state.changed()
+                }
+                state.eyedropperActive = true
+                picking = null
+                state.message = tr("Tap a color on the composition", "روی رنگ موردنظر در بوم بزنید")
+            },
         )
     }
 }

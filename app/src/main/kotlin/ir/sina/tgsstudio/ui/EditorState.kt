@@ -36,6 +36,8 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var previewMode by mutableStateOf(false)
     var multiSelect by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
+    var eyedropperActive by mutableStateOf(false)
+    var eyedropperCallback by mutableStateOf<((Rgba) -> Unit)?>(null)
     /** True when the UI language is Persian (set by the screen), for messages produced outside composition. */
     var isFa: Boolean = false
 

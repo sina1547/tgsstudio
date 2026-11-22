@@ -51,7 +51,7 @@ fun Rgba.toColor() = Color(
 
 /** HSV picker with synchronized HEX/RGBA inputs and editable opacity. */
 @Composable
-fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit) {
+fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit, onEyedropper: (() -> Unit)? = null) {
     val initialColor = remember { initial.toColor() }
     val init = remember { initialColor.toHsv() }
     var h by remember { mutableFloatStateOf(init[0]) }
@@ -164,7 +164,12 @@ fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit)
             }
         },
         confirmButton = {
-            TextButton(onDone) { Text(tr("Done", "تأیید"), color = StudioColors.Accent) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (onEyedropper != null) {
+                    TextButton(onEyedropper) { Text(tr("Pick from canvas", "نمونه از بوم"), color = StudioColors.Accent) }
+                }
+                TextButton(onDone) { Text(tr("Done", "تأیید"), color = StudioColors.Accent) }
+            }
         },
     )
 }

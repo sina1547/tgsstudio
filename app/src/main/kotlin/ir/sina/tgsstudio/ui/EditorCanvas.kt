@@ -14,6 +14,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ShaderBrush
@@ -155,6 +159,37 @@ private fun DrawScope.drawPenPreview(state: EditorState, b: Bezier, density: Flo
     }
 }
 
+/**
+ * Render the current composition off-screen and sample its actual composited pixel.
+ * Sampling uses document coordinates and the same SceneDrawer as the visible canvas.
+ */
+private fun sampleCompositionColor(state: EditorState, point: Offset): ir.sina.tgsstudio.renderer.Rgba? {
+    val doc = state.session.doc
+    if (point.x < 0f || point.y < 0f || point.x >= doc.width || point.y >= doc.height) return null
+    val maxSide = 2048
+    val scale = minOf(1f, maxSide.toFloat() / maxOf(doc.width, doc.height).coerceAtLeast(1))
+    val width = (doc.width * scale).toInt().coerceAtLeast(1)
+    val height = (doc.height * scale).toInt().coerceAtLeast(1)
+    val bitmap = ImageBitmap(width, height)
+    val scene = state.session.scene(state.frame)
+    val bg = doc.root.string("bg")?.removePrefix("#")
+        ?.takeIf { it.matches(Regex("^[0-9A-Fa-f]{6}$")) }
+        ?.let { runCatching { Color(android.graphics.Color.parseColor("#$it")) }.getOrNull() }
+    CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(bitmap), Size(width.toFloat(), height.toFloat())) {
+        if (bg != null) drawRect(bg, size = Size(width.toFloat(), height.toFloat()))
+        withTransform({ scale(scale, scale, Offset.Zero) }) { drawScene(scene) }
+    }
+    val x = (point.x * scale).toInt().coerceIn(0, width - 1)
+    val y = (point.y * scale).toInt().coerceIn(0, height - 1)
+    val pixel = bitmap.asAndroidBitmap().getPixel(x, y)
+    return ir.sina.tgsstudio.renderer.Rgba(
+        android.graphics.Color.red(pixel) / 255.0,
+        android.graphics.Color.green(pixel) / 255.0,
+        android.graphics.Color.blue(pixel) / 255.0,
+        android.graphics.Color.alpha(pixel) / 255.0,
+    )
+}
+
 // ------------------------------------------------------------------------------------------------------
 // gestures
 
@@ -169,6 +204,16 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
         var last = down.position
         var travelled = 0f
         val startDoc = state.toDoc(down.position)
+
+        if (state.eyedropperActive) {
+            val sampled = sampleCompositionColor(state, startDoc)
+            if (sampled != null) state.eyedropperCallback?.invoke(sampled)
+            state.eyedropperActive = false
+            state.eyedropperCallback = null
+            state.message = if (sampled == null) tr("Tap inside the composition", "داخل محدودهٔ کامپوزیشن نمونه‌برداری کنید") else tr("Color sampled", "رنگ نمونه‌برداری شد")
+            state.changed()
+            return@awaitEachGesture
+        }
 
         // gesture-specific state
         var pivotX = 0.0; var pivotY = 0.0; var prevDist = 1.0; var prevAngle = 0.0

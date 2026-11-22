@@ -47,7 +47,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 - [ ] Extend the initial two-stop linear/radial gradient editor to arbitrary multi-stop colors, alpha stops and animated gradient properties.
 - [ ] Font library, family/style selection, tracking, baseline, paragraph alignment and per-project font references.
 - [ ] Live text model for editable project text; vector outlines remain the reliable TGS export fallback.
-- [ ] Eyedropper sampling from the rendered composition.
+- [x] Eyedropper sampling from the rendered composition (v0.7.0; off-screen composite sampling uses the same scene renderer).
 
 ### M4 — Masks, effects and renderer compatibility
 - [ ] UI for creating/editing/animating masks (add, subtract, intersect, difference, inverted).
@@ -74,7 +74,7 @@ This roadmap is the implementation contract for evolving TGS Studio into a gener
 
 ## Current increment
 
-The current branch adds composition-level layer tracks, timeline layer selection (including additive selection), draggable layer In/Out clip edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping, direct frame entry, keyframe insertion at the playhead, editable composition work area, frame-rate controls, and per-layer In/Out/Start/Stretch editing. It also adds a first-pass two-stop linear/radial gradient fill editor with editable endpoint colors and coordinates, plus basic Add-mode mask creation from a top-level path with inversion/removal. Work-area changes retain keyframes outside the active range rather than deleting animation data.
+The current branch includes composition-level layer tracks, additive timeline layer selection, draggable layer In/Out edges with undo grouping, multi-keyframe toggle selection and batch deletion, frame stepping and direct frame entry, playhead keyframe insertion, editable work area and frame-rate controls, per-layer In/Out/Start/Stretch editing, a first-pass two-stop linear/radial gradient fill editor, and basic Add-mode masks from top-level paths. Version 0.7.0 adds a color-picker eyedropper that samples the fully composited current-frame scene off-screen using the same scene drawing code as the canvas; sampled colors are applied to the active fill, stroke, or gradient stop and committed as one undoable operation. Work-area changes retain keyframes outside the active range rather than deleting animation data.
 
 ## Acceptance gates
 
