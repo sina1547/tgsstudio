@@ -275,19 +275,19 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
                 Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
                     ToolGroupLabel(tr("Selection", "انتخاب"))
-                    ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { state.toolsDrawerOpen = false })
                     ToolGroupLabel(tr("Paths", "مسیرها"))
-                    ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
                     ToolGroupLabel(tr("Vector shapes", "اشکال برداری"))
-                    ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
                     ToolGroupLabel(tr("Drawing", "طراحی آزاد"))
-                    ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { toolsOpen = false })
-                    ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { toolsOpen = false })
+                    ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { state.toolsDrawerOpen = false })
                     ToolGroupLabel(tr("Quick add", "افزودن سریع"))
                     ToolDrawerAction(Ic.Rect, tr("Add rectangle", "افزودن مستطیل")) { addObject { addRect(centerX, centerY, 220.0, 160.0) } }
                     ToolDrawerAction(Ic.Ellipse, tr("Add ellipse", "افزودن بیضی")) { addObject { addEllipse(centerX, centerY, 200.0, 200.0) } }
@@ -312,7 +312,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     )
                     ToolGroupLabel(tr("Workspace", "محیط کاری"))
                     listOf(Workspace.DESIGN to tr("Design", "طراحی"), Workspace.ANIMATION to tr("Animation", "انیمیشن"), Workspace.ADVANCED to tr("Advanced", "پیشرفته")).forEach { (w, label) ->
-                        SmallButton(label, { state.setWorkspaceMode(w); toolsOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
+                        SmallButton(label, { state.setWorkspaceMode(w); state.toolsDrawerOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                 }
             } else {
