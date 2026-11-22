@@ -31,6 +31,14 @@ class EditorState(val projectId: String, var projectName: String, val session: E
 
     var tool by mutableStateOf(Tool.SELECT)
     var toolsDrawerOpen by mutableStateOf(false)
+    var showGrid by mutableStateOf(prefs.showGrid)
+    var showRulers by mutableStateOf(prefs.showRulers)
+    var snapToGrid by mutableStateOf(prefs.snapToGrid)
+    var gridSpacing by mutableFloatStateOf(prefs.gridSpacing)
+    fun setShowGrid(value: Boolean) { showGrid = value; prefs.showGrid = value }
+    fun setShowRulers(value: Boolean) { showRulers = value; prefs.showRulers = value }
+    fun setSnapToGrid(value: Boolean) { snapToGrid = value; prefs.snapToGrid = value }
+    fun setGridSpacing(value: Float) { gridSpacing = value.coerceIn(5f, 500f); prefs.gridSpacing = gridSpacing }
     var rightPanelOpen by mutableStateOf(false)
     var rightPanelTab by mutableStateOf(PanelTab.LAYERS)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
