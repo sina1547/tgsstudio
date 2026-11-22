@@ -281,6 +281,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupLabel(tr("Paths", "مسیرها"))
                     ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
                     ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
+                    ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
                     ToolGroupLabel(tr("Vector shapes", "اشکال برداری"))
                     ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
                     ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
@@ -446,7 +447,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 
 @Composable
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
-    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
+    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.LINE to Ic.Draw, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
     Row(
         Modifier.fillMaxWidth().height(44.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
             .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -487,7 +488,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
-        if (state.tool in setOf(Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
+        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
