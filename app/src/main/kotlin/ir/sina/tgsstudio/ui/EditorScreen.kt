@@ -184,7 +184,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                         }
                         Column(Modifier.width(284.dp).fillMaxSize().background(StudioColors.Panel)) { PropertiesPanel(state) }
                     }
-                } else CanvasArea(state)
+                } else CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) })
 
                 state.message?.let { m ->
                     Text(m, color = Color.White, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelHigh).padding(horizontal = 14.dp, vertical = 8.dp))
