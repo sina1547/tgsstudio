@@ -78,10 +78,56 @@ fun EditorCanvas(state: EditorState, modifier: Modifier = Modifier) {
     ) {
         withTransform({ translate(state.viewOffset.x, state.viewOffset.y); scale(state.viewScale, state.viewScale, Offset.Zero) }) {
             if (compositionBackground != null) drawRect(compositionBackground, size = Size(docW, docH)) else drawRect(checker, size = Size(docW, docH))
+            if (state.showGrid) {
+                val step = state.gridSpacing.coerceAtLeast(5f)
+                var x = step
+                while (x < docW) {
+                    drawLine(Color(0x557A91B8), Offset(x, 0f), Offset(x, docH), 0.7f / state.viewScale)
+                    x += step
+                }
+                var y = step
+                while (y < docH) {
+                    drawLine(Color(0x557A91B8), Offset(0f, y), Offset(docW, y), 0.7f / state.viewScale)
+                    y += step
+                }
+            }
             clipRect(0f, 0f, docW, docH) { drawScene(scene) }
-            drawRect(Color(0x55FFFFFF), size = Size(docW, docH), style = Stroke(1f / state.viewScale))
+            drawRect(Color(0x88FFFFFF), size = Size(docW, docH), style = Stroke(1f / state.viewScale))
         }
+        if (state.showRulers) drawCanvasRulers(state, docW, docH, density)
         drawOverlay(state, box, density)
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------
+// Screen-space rulers around the fixed composition frame.
+private fun DrawScope.drawCanvasRulers(state: EditorState, docW: Float, docH: Float, density: Float) {
+    val tl = state.toScreen(0.0, 0.0)
+    val br = state.toScreen(docW.toDouble(), docH.toDouble())
+    val band = 18f * density
+    val left = (tl.x - band).coerceAtLeast(0f)
+    val top = (tl.y - band).coerceAtLeast(0f)
+    drawRect(StudioColors.Panel.copy(alpha = 0.94f), Offset(left, top), Size((br.x - left).coerceAtLeast(0f), (tl.y - top).coerceAtLeast(0f)))
+    drawRect(StudioColors.Panel.copy(alpha = 0.94f), Offset(left, top), Size((tl.x - left).coerceAtLeast(0f), (br.y - top).coerceAtLeast(0f)))
+    val candidates = listOf(10f, 20f, 50f, 100f, 200f, 500f, 1000f)
+    val step = candidates.firstOrNull { it * state.viewScale >= 48f * density } ?: 1000f
+    var x = 0f
+    while (x <= docW) {
+        val sx = tl.x + x * state.viewScale
+        if (sx >= tl.x && sx <= br.x) {
+            drawLine(StudioColors.TextMuted, Offset(sx, tl.y - 7f * density), Offset(sx, tl.y), 1f * density)
+            if ((x / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(x.toInt().toString(), sx + 2f * density, tl.y - 8f * density, textPaint(density))
+        }
+        x += step
+    }
+    var y = 0f
+    while (y <= docH) {
+        val sy = tl.y + y * state.viewScale
+        if (sy >= tl.y && sy <= br.y) {
+            drawLine(StudioColors.TextMuted, Offset(tl.x - 7f * density, sy), Offset(tl.x, sy), 1f * density)
+            if ((y / step).toInt() % 2 == 0) drawContext.canvas.nativeCanvas.drawText(y.toInt().toString(), maxOf(0f, tl.x - 17f * density), sy - 2f * density, textPaint(density))
+        }
+        y += step
     }
 }
 
@@ -326,7 +372,23 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
 
             when (mode) {
                 Mode.PAN -> Unit // Keep the document canvas anchored; empty-space drags do not move the canvas.
-                Mode.MOVE -> { session.dragBy((d.x / state.viewScale).toDouble(), (d.y / state.viewScale).toDouble()); state.changed() }
+                Mode.MOVE -> {
+                    val dx = if (state.snapToGrid) {
+                        val step = state.gridSpacing.coerceAtLeast(5f)
+                        val current = kotlin.math.round(doc.x / step) * step
+                        val previousDoc = state.toDoc(last)
+                        val previous = kotlin.math.round(previousDoc.x / step) * step
+                        (current - previous).toDouble()
+                    } else (d.x / state.viewScale).toDouble()
+                    val dy = if (state.snapToGrid) {
+                        val step = state.gridSpacing.coerceAtLeast(5f)
+                        val current = kotlin.math.round(doc.y / step) * step
+                        val previousDoc = state.toDoc(last)
+                        val previous = kotlin.math.round(previousDoc.y / step) * step
+                        (current - previous).toDouble()
+                    } else (d.y / state.viewScale).toDouble()
+                    session.dragBy(dx, dy); state.changed()
+                }
                 Mode.SCALE -> {
                     val dist = docDist(doc, Offset(pivotX.toFloat(), pivotY.toFloat())).coerceAtLeast(1.0)
                     session.scaleBy(pivotX, pivotY, dist / prevDist); prevDist = dist; state.changed()
