@@ -228,6 +228,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 @Composable
 private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
     val toolsOpen = state.toolsDrawerOpen
+    var showUtilities by remember { mutableStateOf(false) }
     val doc = state.session.doc
     val centerX = doc.width / 2.0
     val centerY = doc.height / 2.0
@@ -291,6 +292,8 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupLabel(tr("Drawing", "طراحی آزاد"))
                     ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { state.toolsDrawerOpen = false })
                     ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { state.toolsDrawerOpen = false })
+                    SmallButton(tr(if (showUtilities) "Hide workspace options" else "Workspace & canvas options", if (showUtilities) "بستن امکانات محیط" else "تنظیمات محیط و بوم"), { showUtilities = !showUtilities }, primary = showUtilities, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp))
+                    if (showUtilities) {
                     ToolGroupLabel(tr("Quick add", "افزودن سریع"))
                     ToolDrawerAction(Ic.Rect, tr("Add rectangle", "افزودن مستطیل")) { addObject { addRect(centerX, centerY, 220.0, 160.0) } }
                     ToolDrawerAction(Ic.Ellipse, tr("Add ellipse", "افزودن بیضی")) { addObject { addEllipse(centerX, centerY, 200.0, 200.0) } }
@@ -326,9 +329,10 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     listOf(Workspace.DESIGN to tr("Design", "طراحی"), Workspace.ANIMATION to tr("Animation", "انیمیشن"), Workspace.ADVANCED to tr("Advanced", "پیشرفته")).forEach { (w, label) ->
                         SmallButton(label, { state.setWorkspaceMode(w); state.toolsDrawerOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
                     }
+                    }
                 }
             } else {
-                IconBtn(Ic.Tools, { state.toolsDrawerOpen = true }, active = true, size = 38.dp, iconSize = 21.dp)
+                IconBtn(Ic.Tools, { state.openToolsDrawer() }, active = true, size = 38.dp, iconSize = 21.dp)
             }
         }
 
@@ -359,8 +363,8 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     if (state.rightPanelTab == PanelTab.LAYERS) LayersPanel(state) else PropertiesPanel(state)
                 }
             } else {
-                IconBtn(Ic.Layers, { state.rightPanelTab = PanelTab.LAYERS; state.rightPanelOpen = true }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 21.dp)
-                IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES; state.rightPanelOpen = true }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
+                IconBtn(Ic.Layers, { state.openRightPanel(PanelTab.LAYERS) }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 21.dp)
+                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
             }
         }
     }
@@ -486,6 +490,13 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
+        if (state.tool in setOf(Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
+            Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
+                SmallButton(tr("From center", "از مرکز"), { state.drawFromCenter = !state.drawFromCenter }, primary = state.drawFromCenter)
+            }
+        }
         if (state.tool == Tool.DRAW) PenSettingsBar(state)
         if (state.tool == Tool.ERASE) {
             Text(tr("Drag over pen strokes to erase them. Shapes are never erased.", "روی خط‌های قلم بکشید تا پاک شوند. شکل‌ها پاک نمی‌شوند."), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 8.dp))
@@ -524,7 +535,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Copy, { state.act { duplicateSelection() } }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Up, { sel.singleOrNull()?.let { t -> state.act { move(t, -1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Down, { sel.singleOrNull()?.let { t -> state.act { move(t, 1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
-                IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES; state.rightPanelOpen = true }, size = 40.dp, iconSize = 20.dp)
+                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
