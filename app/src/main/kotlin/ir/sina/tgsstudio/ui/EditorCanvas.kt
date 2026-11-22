@@ -330,6 +330,10 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     } else mode = Mode.PAN
                 } else mode = Mode.PAN
             }
+            Tool.ADD_NODE, Tool.DELETE_NODE, Tool.SMOOTH_NODE, Tool.CORNER_NODE -> {
+                applyPathPointTool(state, tool, startDoc, hitRadius)
+                mode = Mode.NONE
+            }
             Tool.PEN -> {
                 val cur = state.penPath ?: Bezier(false, DoubleArray(0), DoubleArray(0), DoubleArray(0))
                 val first = if (cur.count > 0) state.toScreen(cur.v[0], cur.v[1]) else null
@@ -337,7 +341,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     session.addFreeform(PathOps.setClosed(cur, true)); state.penPath = null; state.tool = Tool.SELECT; state.changed(); mode = Mode.NONE
                 } else { state.penPath = PathOps.append(cur, startDoc.x.toDouble(), startDoc.y.toDouble()); mode = Mode.PEN }
             }
-            Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
+            Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
             Tool.DRAW -> { mode = Mode.DRAW; state.drawPoints = listOf(startDoc) }
             Tool.ERASE -> {
                 mode = Mode.ERASE; session.beginGesture("Erase")
@@ -442,6 +446,51 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
     }
 }
 
+/** Apply a one-shot anchor-point operation to the currently selected editable path. */
+private fun applyPathPointTool(state: EditorState, tool: Tool, point: Offset, hitRadius: Float) {
+    val ref = state.session.pathShape()
+    val b = ref?.let { state.session.pathBezier(it) }
+    val inverse = ref?.let { state.session.pathToDoc(it).inverse() }
+    if (ref == null || b == null || inverse == null) {
+        state.message = if (state.isFa) "ابتدا یک مسیر قابل ویرایش انتخاب کنید." else "Select an editable path first."
+        return
+    }
+    val x = inverse.mapX(point.x.toDouble(), point.y.toDouble())
+    val y = inverse.mapY(point.x.toDouble(), point.y.toDouble())
+    val scaleLocal = sqrt(kotlin.math.abs(state.session.pathToDoc(ref).determinant)).coerceAtLeast(1e-6)
+    val tolerance = hitRadius / state.viewScale / scaleLocal
+    val hit = PathOps.hit(b, x, y, tolerance, state.nodeIndex)
+    val changed = when (tool) {
+        Tool.ADD_NODE -> if (hit?.type == PathOps.HitType.SEGMENT) {
+            val inserted = state.session.structuralPathEdit(ref, "Add anchor point") { PathOps.insert(it, hit.index, hit.t) }
+            if (inserted) state.nodeIndex = hit.index + 1
+            inserted
+        } else false
+        Tool.DELETE_NODE -> if (hit?.type == PathOps.HitType.VERTEX) {
+            val deleted = state.session.structuralPathEdit(ref, "Delete anchor point") { PathOps.delete(it, hit.index) }
+            if (deleted) state.nodeIndex = -1
+            deleted
+        } else false
+        Tool.SMOOTH_NODE -> if (hit?.type == PathOps.HitType.VERTEX) {
+            state.nodeIndex = hit.index
+            state.session.edit("Smooth anchor point") { state.session.writePath(ref, PathOps.toSmooth(b, hit.index)) }
+            true
+        } else false
+        Tool.CORNER_NODE -> if (hit?.type == PathOps.HitType.VERTEX) {
+            state.nodeIndex = hit.index
+            state.session.edit("Corner anchor point") { state.session.writePath(ref, PathOps.toCorner(b, hit.index)) }
+            true
+        } else false
+        else -> false
+    }
+    state.message = when {
+        changed -> if (state.isFa) "نقطهٔ مسیر ویرایش شد" else "Anchor point updated"
+        tool == Tool.DELETE_NODE && hit?.type == PathOps.HitType.VERTEX -> if (state.isFa) "مسیر حداقل دو نقطه لازم دارد." else "A path needs at least two points."
+        else -> if (state.isFa) "روی نقطه یا قطعهٔ مسیر بزنید." else "Tap an anchor point or path segment."
+    }
+    state.changed()
+}
+
 private fun shapeBounds(state: EditorState, a: Offset, b: Offset): Pair<Offset, Offset> {
     var dx = b.x - a.x
     var dy = b.y - a.y
@@ -465,9 +514,10 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
         when (tool) {
             Tool.LINE -> addFreeform(Bezier(false, doubleArrayOf(p0.x.toDouble(), p0.y.toDouble(), p1.x.toDouble(), p1.y.toDouble()), DoubleArray(4), DoubleArray(4)), filled = false)
             Tool.RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
+            Tool.ROUNDED_RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0), roundness = state.rectRoundness.toDouble())
             Tool.ELLIPSE -> addEllipse(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
-            Tool.STAR -> addStar(cx, cy, max(w, h) / 2)
-            Tool.POLYGON -> addPolygon(cx, cy, max(w, h) / 2)
+            Tool.STAR -> addStar(cx, cy, max(w, h) / 2, points = state.starPoints)
+            Tool.POLYGON -> addPolygon(cx, cy, max(w, h) / 2, points = state.polygonSides)
             else -> null
         }
     }
