@@ -31,6 +31,10 @@ class EditorState(val projectId: String, var projectName: String, val session: E
 
     var tool by mutableStateOf(Tool.SELECT)
     var toolsDrawerOpen by mutableStateOf(false)
+    var constrainShape by mutableStateOf(false)
+    var drawFromCenter by mutableStateOf(false)
+    fun openToolsDrawer() { rightPanelOpen = false; toolsDrawerOpen = true }
+    fun openRightPanel(tab: PanelTab = rightPanelTab) { toolsDrawerOpen = false; rightPanelTab = tab; rightPanelOpen = true }
     var showGrid by mutableStateOf(prefs.showGrid)
     var showRulers by mutableStateOf(prefs.showRulers)
     var snapToGrid by mutableStateOf(prefs.snapToGrid)
@@ -128,9 +132,10 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     fun setWorkspaceMode(w: Workspace) {
         workspace = w; prefs.workspace = w.name.lowercase()
         when (w) {
-            Workspace.DESIGN -> { rightPanelTab = PanelTab.LAYERS; rightPanelOpen = true; updatePanel(null) }
+            Workspace.DESIGN -> { toolsDrawerOpen = false; rightPanelTab = PanelTab.LAYERS; rightPanelOpen = true; updatePanel(null) }
             Workspace.ANIMATION -> updatePanel(PanelTab.TIMELINE)
             Workspace.ADVANCED -> {
+                toolsDrawerOpen = false
                 if (panel == PanelTab.LAYERS || panel == PanelTab.PROPERTIES) {
                     rightPanelTab = panel!!
                     updatePanel(null)
