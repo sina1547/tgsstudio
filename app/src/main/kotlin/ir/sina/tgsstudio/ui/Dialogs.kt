@@ -144,7 +144,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
         title = { DialogTitle("SINA TGS Studio") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tr("Version 0.2.0", "نسخهٔ ۰٫۲٫۰"), color = StudioColors.TextMuted)
+                Text(tr("Version 0.9.8", "نسخهٔ ۰٫۹٫۸"), color = StudioColors.TextMuted)
                 Text(tr("An offline editor for Telegram animated stickers (TGS). Everything runs on your phone; no account or internet is needed.", "ویرایشگر آفلاین استیکرهای متحرک تلگرام (TGS). همه‌چیز روی گوشی شما اجرا می‌شود؛ حساب کاربری یا اینترنت لازم نیست."), color = StudioColors.TextPrimary, fontSize = 14.sp)
             }
         },
