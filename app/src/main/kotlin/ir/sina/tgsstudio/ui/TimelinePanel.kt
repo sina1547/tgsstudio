@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -171,7 +174,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
     val density = LocalDensity.current.density
     val ppf = state.timelinePxPerFrame
     val rulerPx = 24f * density
-    val rowPx = 32f * density
+    val rowPx = 36f * density
     fun selectLayer(index: Int) {
         val target = LayerTarget(LayerRef(null, index))
         val next = if (state.multiSelect) {
@@ -181,9 +184,16 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
     }
 
     Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        Text(tr("Composition layers", "لایه‌های کامپوزیشن"), color = StudioColors.TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
+        Row(
+            Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Ic.Layers, StudioColors.Accent, 15.dp)
+            Text(tr("Layers", "لایه‌ها"), color = StudioColors.TextPrimary, fontSize = 11.sp, modifier = Modifier.padding(start = 6.dp).weight(1f))
+            Text("${layers.size}", color = StudioColors.TextMuted, fontSize = 10.sp)
+        }
         Row(Modifier.fillMaxWidth().heightIn(max = 148.dp).verticalScroll(rememberScrollState())) {
-            Column(Modifier.width(LABEL_W)) {
+            Column(Modifier.width(LABEL_W).background(StudioColors.PanelRaised)) {
                 Box(Modifier.height(24.dp))
                 layers.forEachIndexed { index, layer ->
                     val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
@@ -192,15 +202,17 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         color = if (selected) StudioColors.Accent else StudioColors.TextPrimary,
                         fontSize = 11.sp,
                         maxLines = 1,
-                        modifier = Modifier.fillMaxWidth().height(32.dp).clickable {
-                            selectLayer(index)
-                        }.padding(start = 8.dp, top = 8.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 4.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (selected) StudioColors.AccentSoft else StudioColors.PanelHigh.copy(alpha = 0.45f))
+                            .clickable { selectLayer(index) }
+                            .padding(start = 8.dp, top = 9.dp),
                     )
                 }
             }
             Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                 Canvas(
-                    Modifier.width(widthDp).height((24 + 32 * layers.size).dp).background(StudioColors.Panel)
+                    Modifier.width(widthDp).height((24 + 36 * layers.size).dp).background(StudioColors.Panel)
                         .pointerInput(ppf) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
@@ -301,6 +313,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                     }
                     layers.forEachIndexed { index, layer ->
                         val top = rulerPx + index * rowPx
+                        if (index % 2 == 1) drawRect(StudioColors.PanelRaised.copy(alpha = 0.28f), Offset(0f, top), Size(size.width, rowPx))
                         drawLine(StudioColors.Divider, Offset(0f, top + rowPx), Offset(size.width, top + rowPx), 1f)
                         val start = (layer.inPoint - doc.inPoint).coerceAtLeast(0.0)
                         val end = (layer.outPoint - doc.inPoint).coerceAtMost(doc.outPoint - doc.inPoint)
@@ -325,6 +338,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                     }
                     val px = ((state.frame - doc.inPoint) * ppf).toFloat()
                     drawLine(StudioColors.Warning, Offset(px, 0f), Offset(px, size.height), 1.5f * density)
+                    drawCircle(StudioColors.Warning, 5f * density, Offset(px, rulerPx / 2f))
                 }
             }
         }
