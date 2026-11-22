@@ -533,6 +533,8 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
 private fun parametricCurve(cx: Double, cy: Double, radius: Double, degrees: Int, turns: Int): Bezier {
     val samples = (max(24, degrees / 4)).coerceAtMost(720)
     val vertices = DoubleArray((samples + 1) * 2)
+    val incoming = DoubleArray(vertices.size)
+    val outgoing = DoubleArray(vertices.size)
     for (i in 0..samples) {
         val t = i.toDouble() / samples
         val angle = -PI / 2.0 + (degrees.coerceIn(30, 2160) * PI / 180.0) * t
@@ -540,7 +542,24 @@ private fun parametricCurve(cx: Double, cy: Double, radius: Double, degrees: Int
         vertices[2 * i] = cx + cos(angle) * r
         vertices[2 * i + 1] = cy + sin(angle) * r
     }
-    return Bezier(false, vertices, DoubleArray(vertices.size), DoubleArray(vertices.size))
+    // Catmull-Rom tangents become relative cubic Bézier handles, avoiding the polygonal
+    // appearance of zero-handle sampled paths while keeping every point editable.
+    for (i in 0..samples) {
+        val px = vertices[2 * i]; val py = vertices[2 * i + 1]
+        if (i == 0) {
+            outgoing[0] = (vertices[2] - px) / 3.0
+            outgoing[1] = (vertices[3] - py) / 3.0
+        } else if (i == samples) {
+            incoming[2 * i] = (vertices[2 * (i - 1)] - px) / 3.0
+            incoming[2 * i + 1] = (vertices[2 * (i - 1) + 1] - py) / 3.0
+        } else {
+            val dx = (vertices[2 * (i + 1)] - vertices[2 * (i - 1)]) / 6.0
+            val dy = (vertices[2 * (i + 1) + 1] - vertices[2 * (i - 1) + 1]) / 6.0
+            outgoing[2 * i] = dx; outgoing[2 * i + 1] = dy
+            incoming[2 * i] = -dx; incoming[2 * i + 1] = -dy
+        }
+    }
+    return Bezier(false, vertices, incoming, outgoing)
 }
 
 /** Pen up: fit the touch points into a path layer; with write-on, time it from the playhead (or right after the previous stroke). */
