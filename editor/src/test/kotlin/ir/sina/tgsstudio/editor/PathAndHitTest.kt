@@ -32,6 +32,25 @@ class PathAndHitTest {
         assertEquals(3, PathOps.setClosed(b, false).toContour().segments.size)
     }
 
+    @Test fun reversePreservesBezierGeometryAndSwapsHandles() {
+        val source = Bezier(
+            false,
+            doubleArrayOf(0.0, 0.0, 80.0, 30.0, 150.0, 100.0),
+            doubleArrayOf(0.0, 0.0, -12.0, -8.0, -20.0, -10.0),
+            doubleArrayOf(18.0, 12.0, 25.0, 20.0, 0.0, 0.0),
+        )
+        val reversed = PathOps.reverse(source)
+        assertEquals(source.count, reversed.count)
+        near(source.v[4], reversed.v[0]); near(source.v[5], reversed.v[1])
+        near(source.v[0], reversed.v[4]); near(source.v[1], reversed.v[5])
+        near(source.outT[4], reversed.inT[0]); near(source.outT[5], reversed.inT[1])
+        near(source.inT[0], reversed.outT[4]); near(source.inT[1], reversed.outT[5])
+        near(source.toContour().length, reversed.toContour().length, 1e-6)
+        val closed = PathOps.reverse(square())
+        assertTrue(closed.closed)
+        near(square().toContour().length, closed.toContour().length, 1e-6)
+    }
+
     @Test fun smoothAndCornerHandles() {
         val b = PathOps.toSmooth(square(), 1)
         assertTrue(PathOps.isSmooth(b, 1))
