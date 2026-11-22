@@ -45,4 +45,17 @@ class AppPrefs(context: Context) {
     var workspace: String
         get() = sp.getString("workspace", "design") ?: "design"
         set(v) { sp.edit().putString("workspace", v).apply() }
+
+    var showGrid: Boolean
+        get() = sp.getBoolean("canvasGrid", false)
+        set(v) { sp.edit().putBoolean("canvasGrid", v).apply() }
+    var showRulers: Boolean
+        get() = sp.getBoolean("canvasRulers", false)
+        set(v) { sp.edit().putBoolean("canvasRulers", v).apply() }
+    var snapToGrid: Boolean
+        get() = sp.getBoolean("canvasSnap", false)
+        set(v) { sp.edit().putBoolean("canvasSnap", v).apply() }
+    var gridSpacing: Float
+        get() = sp.getFloat("canvasGridSpacing", 50f)
+        set(v) { sp.edit().putFloat("canvasGridSpacing", v.coerceIn(5f, 500f)).apply() }
 }
