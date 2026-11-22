@@ -37,6 +37,9 @@ import ir.sina.tgsstudio.document.ShapeRef
 import ir.sina.tgsstudio.renderer.Affine
 import ir.sina.tgsstudio.renderer.Bezier
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -341,7 +344,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     session.addFreeform(PathOps.setClosed(cur, true)); state.penPath = null; state.tool = Tool.SELECT; state.changed(); mode = Mode.NONE
                 } else { state.penPath = PathOps.append(cur, startDoc.x.toDouble(), startDoc.y.toDouble()); mode = Mode.PEN }
             }
-            Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
+            Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
             Tool.DRAW -> { mode = Mode.DRAW; state.drawPoints = listOf(startDoc) }
             Tool.ERASE -> {
                 mode = Mode.ERASE; session.beginGesture("Erase")
@@ -518,10 +521,26 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
             Tool.ELLIPSE -> addEllipse(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
             Tool.STAR -> addStar(cx, cy, max(w, h) / 2, points = state.starPoints)
             Tool.POLYGON -> addPolygon(cx, cy, max(w, h) / 2, points = state.polygonSides)
+            Tool.ARC -> addFreeform(parametricCurve(cx, cy, max(w, h) / 2, state.arcDegrees, 1), filled = false)
+            Tool.SPIRAL -> addFreeform(parametricCurve(cx, cy, max(w, h) / 2, 360 * state.spiralTurns, state.spiralTurns), filled = false)
             else -> null
         }
     }
     state.tool = Tool.SELECT
+}
+
+/** Builds editable open paths for the Arc and Spiral tools from sampled parametric curves. */
+private fun parametricCurve(cx: Double, cy: Double, radius: Double, degrees: Int, turns: Int): Bezier {
+    val samples = (max(24, degrees / 4)).coerceAtMost(720)
+    val vertices = DoubleArray((samples + 1) * 2)
+    for (i in 0..samples) {
+        val t = i.toDouble() / samples
+        val angle = -PI / 2.0 + (degrees.coerceIn(30, 2160) * PI / 180.0) * t
+        val r = if (turns <= 1) radius else radius * (0.08 + 0.92 * t)
+        vertices[2 * i] = cx + cos(angle) * r
+        vertices[2 * i + 1] = cy + sin(angle) * r
+    }
+    return Bezier(false, vertices, DoubleArray(vertices.size), DoubleArray(vertices.size))
 }
 
 /** Pen up: fit the touch points into a path layer; with write-on, time it from the playhead (or right after the previous stroke). */
