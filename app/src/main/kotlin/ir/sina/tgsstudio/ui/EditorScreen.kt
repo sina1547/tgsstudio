@@ -228,6 +228,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
 private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
     val toolsOpen = state.toolsDrawerOpen
     var showUtilities by remember { mutableStateOf(false) }
+    var expandedToolGroups by remember { mutableStateOf(setOf("selection", "paths", "shapes", "drawing")) }
+    fun toggleToolGroup(key: String) { expandedToolGroups = if (key in expandedToolGroups) expandedToolGroups - key else expandedToolGroups + key }
     val doc = state.session.doc
     val centerX = doc.width / 2.0
     val centerY = doc.height / 2.0
@@ -275,21 +277,29 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
                 Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
-                    ToolGroupLabel(tr("Selection", "انتخاب"))
-                    ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { state.toolsDrawerOpen = false })
-                    ToolGroupLabel(tr("Paths", "مسیرها"))
-                    ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
-                    ToolGroupLabel(tr("Vector shapes", "اشکال برداری"))
-                    ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
-                    ToolGroupLabel(tr("Drawing", "طراحی آزاد"))
-                    ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { state.toolsDrawerOpen = false })
-                    ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { state.toolsDrawerOpen = false })
+                    ToolGroupHeader(tr("Selection & navigation", "انتخاب و جابه‌جایی"), "selection" in expandedToolGroups) { toggleToolGroup("selection") }
+                    if ("selection" in expandedToolGroups) {
+                        ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.HAND, Ic.Hand, tr("Pan / Hand", "جابجایی بوم"), { state.toolsDrawerOpen = false })
+                    }
+                    ToolGroupHeader(tr("Path & node editing", "مسیر و ویرایش گره"), "paths" in expandedToolGroups) { toggleToolGroup("paths") }
+                    if ("paths" in expandedToolGroups) {
+                        ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
+                    }
+                    ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
+                    if ("shapes" in expandedToolGroups) {
+                        ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
+                    }
+                    ToolGroupHeader(tr("Freehand drawing", "طراحی آزاد"), "drawing" in expandedToolGroups) { toggleToolGroup("drawing") }
+                    if ("drawing" in expandedToolGroups) {
+                        ToolDrawerItem(state, Tool.DRAW, Ic.Draw, tr("Freehand", "طراحی آزاد"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ERASE, Ic.Eraser, tr("Stroke Eraser", "پاک‌کن خطوط"), { state.toolsDrawerOpen = false })
+                    }
                     SmallButton(tr(if (showUtilities) "Hide workspace options" else "Workspace & canvas options", if (showUtilities) "بستن امکانات محیط" else "تنظیمات محیط و بوم"), { showUtilities = !showUtilities }, primary = showUtilities, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp))
                     if (showUtilities) {
                     ToolGroupLabel(tr("Quick add", "افزودن سریع"))
@@ -365,6 +375,18 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
             }
         }
+    }
+}
+
+@Composable
+private fun ToolGroupHeader(label: String, expanded: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+            .padding(start = 8.dp, end = 5.dp, top = 9.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = StudioColors.TextMuted, fontSize = 10.sp, modifier = Modifier.weight(1f))
+        Icon(if (expanded) Ic.ChevronDown else Ic.Chevron, StudioColors.TextMuted, 14.dp)
     }
 }
 
