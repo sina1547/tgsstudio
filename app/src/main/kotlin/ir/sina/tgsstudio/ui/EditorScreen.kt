@@ -138,19 +138,25 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    val svgPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("no stream")
-                state.act { addSvg(text) }
-            }.onSuccess { r ->
-                state.openRightPanel(PanelTab.PROPERTIES)
-                state.message = when {
-                    r == null || r.groups.isEmpty() -> if (lang == Lang.FA) "شکل برداری در این SVG پیدا نشد." else "No vector shapes found in this SVG."
-                    r.skipped.isNotEmpty() -> (if (lang == Lang.FA) "وارد شد. پشتیبانی‌نشده: " else "Imported. Not supported: ") + r.skipped.joinToString()
-                    else -> if (lang == Lang.FA) "SVG وارد شد" else "SVG imported"
-                }
-            }.onFailure { state.message = (if (lang == Lang.FA) "SVG خوانده نشد: " else "Couldn't read SVG: ") + (it.message ?: "") }
+    val svgPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris: List<android.net.Uri> ->
+        if (uris.isNotEmpty()) {
+            var imported = 0
+            var unsupported = 0
+            var failed = 0
+            uris.forEach { uri ->
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("no stream")
+                    state.act { addSvg(text) }
+                }.onSuccess { result ->
+                    if (result == null || result.groups.isEmpty()) unsupported++ else imported++
+                }.onFailure { failed++ }
+            }
+            state.openRightPanel(PanelTab.PROPERTIES)
+            state.message = if (lang == Lang.FA) {
+                "$imported فایل SVG وارد شد؛ $unsupported بدون شکل برداری؛ $failed خطا"
+            } else {
+                "$imported SVG imported; $unsupported contained no supported vectors; $failed failed"
+            }
         }
     }
 
