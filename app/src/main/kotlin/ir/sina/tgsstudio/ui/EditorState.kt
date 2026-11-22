@@ -14,7 +14,7 @@ import ir.sina.tgsstudio.renderer.Bezier
 import ir.sina.tgsstudio.renderer.Rgba
 import ir.sina.tgsstudio.editor.Target
 
-enum class Tool { SELECT, HAND, PEN, NODE, ADD_NODE, DELETE_NODE, SMOOTH_NODE, CORNER_NODE, LINE, RECT, ROUNDED_RECT, ELLIPSE, STAR, POLYGON, DRAW, ERASE }
+enum class Tool { SELECT, HAND, PEN, NODE, ADD_NODE, DELETE_NODE, SMOOTH_NODE, CORNER_NODE, LINE, RECT, ROUNDED_RECT, ELLIPSE, STAR, POLYGON, ARC, SPIRAL, DRAW, ERASE }
 enum class Workspace { DESIGN, ANIMATION, ADVANCED }
 enum class PanelTab { LAYERS, PROPERTIES, TIMELINE, EFFECTS }
 
@@ -37,6 +37,8 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var starPoints by mutableIntStateOf(5)
     var polygonSides by mutableIntStateOf(6)
     var rectRoundness by mutableFloatStateOf(24f)
+    var arcDegrees by mutableIntStateOf(270)
+    var spiralTurns by mutableIntStateOf(3)
     fun openToolsDrawer() { rightPanelOpen = false; toolsDrawerOpen = true }
     fun openRightPanel(tab: PanelTab = rightPanelTab) { toolsDrawerOpen = false; rightPanelTab = tab; rightPanelOpen = true }
     var showGrid by mutableStateOf(prefs.showGrid)
