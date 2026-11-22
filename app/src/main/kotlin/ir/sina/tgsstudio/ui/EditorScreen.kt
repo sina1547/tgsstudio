@@ -96,14 +96,27 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (state.dirty) runCatching { store.save(state.projectId, doc, renderThumbnail(doc)); state.markSaved() } }
 
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        val kind = pendingKind
-        if (uri != null && kind != null) {
-            val ok = runCatching {
-                val bytes = when (kind) { ExportKind.TGS -> Exporter.tgs(doc); ExportKind.JSON -> Exporter.lottieJson(doc).toByteArray(Charsets.UTF_8); ExportKind.SVG -> Exporter.svgFrame(doc, state.frame).toByteArray(Charsets.UTF_8) }
-                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("no stream")
-            }.isSuccess
-            Toast.makeText(context, if (ok) (if (lang == Lang.FA) "خروجی ذخیره شد" else "Exported") else (if (lang == Lang.FA) "خروجی ناموفق بود" else "Export failed"), Toast.LENGTH_SHORT).show()
+    fun writeExport(uri: android.net.Uri?, kind: ExportKind) {
+        if (uri == null) return
+        val ok = runCatching {
+            val bytes = when (kind) {
+                ExportKind.TGS -> Exporter.tgs(doc)
+                ExportKind.JSON -> Exporter.lottieJson(doc).toByteArray(Charsets.UTF_8)
+                ExportKind.SVG -> Exporter.svgFrame(doc, state.frame).toByteArray(Charsets.UTF_8)
+            }
+            context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("no stream")
+        }.isSuccess
+        Toast.makeText(context, if (ok) (if (lang == Lang.FA) "خروجی ${kind.ext.uppercase()} ذخیره شد" else "${kind.ext.uppercase()} exported") else (if (lang == Lang.FA) "خروجی ناموفق بود" else "Export failed"), Toast.LENGTH_SHORT).show()
+    }
+    val tgsExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(ExportKind.TGS.mime)) { writeExport(it, ExportKind.TGS) }
+    val jsonExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(ExportKind.JSON.mime)) { writeExport(it, ExportKind.JSON) }
+    val svgExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(ExportKind.SVG.mime)) { writeExport(it, ExportKind.SVG) }
+    fun launchExport(kind: ExportKind) {
+        val name = "${state.projectName}.${kind.ext}"
+        when (kind) {
+            ExportKind.TGS -> tgsExportLauncher.launch(name)
+            ExportKind.JSON -> jsonExportLauncher.launch(name)
+            ExportKind.SVG -> svgExportLauncher.launch(name)
         }
     }
     val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -215,7 +228,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         }
     }
 
-    if (showExport) ExportDialog(doc, { kind -> pendingKind = kind; exportLauncher.launch("${state.projectName}.${kind.ext}") }, { showExport = false })
+    if (showExport) ExportDialog(doc, { kind -> showExport = false; launchExport(kind) }, { showExport = false })
     if (showText) TextDialog(state, { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/octet-stream")) }) { showText = false }
     if (showRename) NameDialog(tr("Project name", "نام پروژه"), state.projectName, { n -> state.projectName = n; store.rename(state.projectId, n); doc.name = n; showRename = false; state.changed() }, { showRename = false })
     if (showLeave) ConfirmDialog(
@@ -476,20 +489,49 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 
 @Composable
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
-    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.ADD_NODE to Ic.Add, Tool.DELETE_NODE to Ic.Trash, Tool.SMOOTH_NODE to Ic.Draw, Tool.CORNER_NODE to Ic.Node, Tool.LINE to Ic.Draw, Tool.RECT to Ic.Rect, Tool.ROUNDED_RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
+    val tools = listOf(
+        Triple(Tool.SELECT, Ic.Select, tr("Select", "انتخاب")),
+        Triple(Tool.HAND, Ic.Hand, tr("Pan", "جابجایی")),
+        Triple(Tool.PEN, Ic.Pen, tr("Pen", "قلم")),
+        Triple(Tool.NODE, Ic.Node, tr("Node", "گره")),
+        Triple(Tool.ADD_NODE, Ic.AddNode, tr("Add node", "افزودن گره")),
+        Triple(Tool.DELETE_NODE, Ic.DeleteNode, tr("Delete node", "حذف گره")),
+        Triple(Tool.SMOOTH_NODE, Ic.SmoothNode, tr("Smooth", "نرم")),
+        Triple(Tool.CORNER_NODE, Ic.CornerNode, tr("Corner", "گوشه")),
+        Triple(Tool.LINE, Ic.Line, tr("Line", "خط")),
+        Triple(Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل")),
+        Triple(Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Round rect", "مستطیل گرد")),
+        Triple(Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی")),
+        Triple(Tool.STAR, Ic.Star, tr("Star", "ستاره")),
+        Triple(Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی")),
+        Triple(Tool.ARC, Ic.Arc, tr("Arc", "کمان")),
+        Triple(Tool.SPIRAL, Ic.Spiral, tr("Spiral", "مارپیچ")),
+        Triple(Tool.DRAW, Ic.Draw, tr("Draw", "نقاشی")),
+        Triple(Tool.ERASE, Ic.Eraser, tr("Eraser", "پاک‌کن")),
+    )
     Row(
-        Modifier.fillMaxWidth().height(44.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
+        Modifier.fillMaxWidth().height(66.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
             .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Row(
-            Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 3.dp, vertical = 2.dp),
+            Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            tools.forEach { (t, ic) ->
-                IconBtn(ic, { state.tool = t; if (t != Tool.PEN) state.penPath = null; state.changed() }, active = state.tool == t, size = 40.dp, iconSize = 20.dp)
+            tools.forEach { (t, ic, label) ->
+                Column(
+                    Modifier.width(48.dp).clip(RoundedCornerShape(9.dp))
+                        .background(if (state.tool == t) StudioColors.AccentSoft else Color.Transparent)
+                        .clickable { state.tool = t; if (t != Tool.PEN) state.penPath = null; state.changed() }
+                        .padding(vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(ic, if (state.tool == t) StudioColors.Accent else StudioColors.TextPrimary, 20.dp)
+                    Text(label, color = if (state.tool == t) StudioColors.Accent else StudioColors.TextMuted, fontSize = 8.sp, maxLines = 1)
+                }
             }
         }
         Row(
