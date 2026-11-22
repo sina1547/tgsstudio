@@ -286,11 +286,16 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     if ("paths" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ADD_NODE, Ic.Add, tr("Add Anchor Point", "افزودن نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.DELETE_NODE, Ic.Trash, tr("Delete Anchor Point", "حذف نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SMOOTH_NODE, Ic.Draw, tr("Smooth Point", "نقطه منحنی"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.CORNER_NODE, Ic.Node, tr("Corner Point", "نقطه گوشه"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
                     if ("shapes" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.Rect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
@@ -469,7 +474,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
 
 @Composable
 private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
-    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.LINE to Ic.Draw, Tool.RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
+    val tools = listOf(Tool.SELECT to Ic.Select, Tool.HAND to Ic.Hand, Tool.PEN to Ic.Pen, Tool.NODE to Ic.Node, Tool.ADD_NODE to Ic.Add, Tool.DELETE_NODE to Ic.Trash, Tool.SMOOTH_NODE to Ic.Draw, Tool.CORNER_NODE to Ic.Node, Tool.LINE to Ic.Draw, Tool.RECT to Ic.Rect, Tool.ROUNDED_RECT to Ic.Rect, Tool.ELLIPSE to Ic.Ellipse, Tool.STAR to Ic.Star, Tool.POLYGON to Ic.Polygon, Tool.DRAW to Ic.Draw, Tool.ERASE to Ic.Eraser)
     Row(
         Modifier.fillMaxWidth().height(44.dp).background(StudioColors.Background).horizontalScroll(rememberScrollState())
             .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -510,12 +515,36 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
-        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
+        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
                 SmallButton(tr("From center", "از مرکز"), { state.drawFromCenter = !state.drawFromCenter }, primary = state.drawFromCenter)
             }
+            when (state.tool) {
+                Tool.STAR -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Star points: ${state.starPoints}", "تعداد پره‌ها: ${state.starPoints}"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    GestureSlider(state.starPoints.toFloat(), 3f..20f, {}, { state.starPoints = it.toInt().coerceIn(3, 20) }, {})
+                }
+                Tool.POLYGON -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Sides: ${state.polygonSides}", "تعداد اضلاع: ${state.polygonSides}"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    GestureSlider(state.polygonSides.toFloat(), 3f..20f, {}, { state.polygonSides = it.toInt().coerceIn(3, 20) }, {})
+                }
+                Tool.ROUNDED_RECT -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Corner radius: ${fmt(state.rectRoundness.toDouble(), 0)} px", "شعاع گوشه: ${fmt(state.rectRoundness.toDouble(), 0)} پیکسل"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {})
+                }
+                else -> Unit
+            }
+        }
+        if (state.tool in setOf(Tool.ADD_NODE, Tool.DELETE_NODE, Tool.SMOOTH_NODE, Tool.CORNER_NODE)) {
+            val instruction = when (state.tool) {
+                Tool.ADD_NODE -> tr("Tap a path segment to insert an anchor.", "برای افزودن نقطه روی قطعه مسیر بزنید.")
+                Tool.DELETE_NODE -> tr("Tap an anchor to remove it.", "برای حذف، روی نقطه اتصال بزنید.")
+                Tool.SMOOTH_NODE -> tr("Tap an anchor to create smooth handles.", "برای ساخت دسته منحنی روی نقطه بزنید.")
+                else -> tr("Tap an anchor to make it a sharp corner.", "برای تبدیل به گوشه تیز روی نقطه بزنید.")
+            }
+            Text(instruction, color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 8.dp))
         }
         if (state.tool == Tool.DRAW) PenSettingsBar(state)
         if (state.tool == Tool.ERASE) {
