@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 
 enum class Ic {
     Back, Play, Pause, Prev, Next, Loop, Eye, EyeOff, Lock, Unlock, Undo, Redo, Save, Export, More, Preview,
-    Select, Hand, Pen, Node, Rect, Ellipse, Star, Polygon, Text, Svg, Layers, Props, Timeline, Add,
+    Select, Hand, Pen, Node, AddNode, DeleteNode, SmoothNode, CornerNode, Line, RoundedRect, Arc, Spiral, Rect, Ellipse, Star, Polygon, Text, Svg, Layers, Props, Timeline, Add,
     Close, Plus, Minus, Trash, Copy, Group, Ungroup, Up, Down, Check, Diamond, Folder, Shape, NullLayer, Precomp, Fit, Split,
     Chevron, ChevronDown, Settings, Info, Path, Key, Link, Draw, Eraser, Effects, Tools,
 }
@@ -65,6 +65,14 @@ private fun DrawScope.drawIcon(ic: Ic, c: Color, u: Float) {
         Ic.Hand -> { path({ m(8f, 13f); l(8f, 6f); cubic(8f, 4f, 11f, 4f, 11f, 6f); l(11f, 11f); l(11f, 4f); cubic(11f, 2f, 14f, 2f, 14f, 4f); l(14f, 11f); l(14f, 6f); cubic(14f, 4.5f, 17f, 4.5f, 17f, 6f); l(17f, 14f); cubic(17f, 19f, 14f, 21f, 12f, 21f); cubic(9f, 21f, 7f, 18f, 5f, 15f); cubic(4f, 13f, 6.5f, 12f, 8f, 13f) }) }
         Ic.Pen -> { path({ m(4f, 20f); l(5f, 15f); l(16f, 4f); l(20f, 8f); l(9f, 19f); close() }); line(13f, 7f, 17f, 11f) }
         Ic.Node -> { path({ m(4f, 18f); cubic(6f, 6f, 14f, 6f, 20f, 8f) }); rect(2.5f, 16.5f, 3.5f, 3.5f, true); rect(18.5f, 6f, 3.5f, 3.5f, true) }
+        Ic.AddNode -> { path({ m(4f, 18f); cubic(6f, 6f, 14f, 6f, 20f, 8f) }); circle(4f, 18f, 2.5f); circle(20f, 8f, 2.5f); line(12f, 3f, 12f, 9f); line(9f, 6f, 15f, 6f) }
+        Ic.DeleteNode -> { path({ m(4f, 18f); cubic(6f, 6f, 14f, 6f, 20f, 8f) }); circle(4f, 18f, 2.5f); circle(20f, 8f, 2.5f); line(9f, 6f, 15f, 6f) }
+        Ic.SmoothNode -> { path({ m(3f, 16f); cubic(7f, 5f, 17f, 5f, 21f, 16f) }); circle(3f, 16f, 2f, true); circle(21f, 16f, 2f, true); line(12f, 4f, 12f, 9f); circle(12f, 4f, 1.5f, true) }
+        Ic.CornerNode -> { path({ m(4f, 19f); l(4f, 9f); l(14f, 9f); l(20f, 3f) }); circle(4f, 19f, 2f, true); circle(4f, 9f, 2f, true); circle(14f, 9f, 2f, true) }
+        Ic.Line -> line(4f, 20f, 20f, 4f)
+        Ic.RoundedRect -> { path({ m(8f, 4f); l(16f, 4f); cubic(19f, 4f, 20f, 5f, 20f, 8f); l(20f, 16f); cubic(20f, 19f, 19f, 20f, 16f, 20f); l(8f, 20f); cubic(5f, 20f, 4f, 19f, 4f, 16f); l(4f, 8f); cubic(4f, 5f, 5f, 4f, 8f, 4f) }) }
+        Ic.Arc -> path({ m(4f, 19f); cubic(4f, 5f, 20f, 5f, 20f, 19f) })
+        Ic.Spiral -> path({ m(12f, 12f); cubic(17f, 12f, 17f, 17f, 12f, 17f); cubic(6f, 17f, 6f, 7f, 13f, 7f); cubic(22f, 7f, 22f, 22f, 11f, 22f) })
         Ic.Rect -> rect(4f, 6f, 16f, 12f)
         Ic.Ellipse -> circle(12f, 12f, 8f)
         Ic.Star -> path({ m(12f, 3f); l(14.6f, 9f); l(21f, 9.5f); l(16f, 13.8f); l(17.7f, 20.3f); l(12f, 16.8f); l(6.3f, 20.3f); l(8f, 13.8f); l(3f, 9.5f); l(9.4f, 9f); close() })
