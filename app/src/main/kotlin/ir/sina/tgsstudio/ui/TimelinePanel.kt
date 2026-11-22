@@ -558,8 +558,8 @@ private fun clampKeyframeGroupDelta(
         val prop = rows.getOrNull(row)?.prop ?: return@forEach
         val times = KeyframeOps.times(prop)
         val selected = selectedIndices.toSet()
-        selectedIndices.forEach { index ->
-            val time = times.getOrNull(index) ?: return@forEach
+        selectedIndices.forEach keyLoop@{ index ->
+            val time = times.getOrNull(index) ?: return@keyLoop
             if (requested > 0.0) {
                 val nextUnselected = times.indices.asSequence()
                     .filter { it !in selected }
