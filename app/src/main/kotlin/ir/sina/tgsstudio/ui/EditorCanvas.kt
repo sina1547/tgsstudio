@@ -210,7 +210,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
             if (sampled != null) state.eyedropperCallback?.invoke(sampled)
             state.eyedropperActive = false
             state.eyedropperCallback = null
-            state.message = if (sampled == null) tr("Tap inside the composition", "داخل محدودهٔ کامپوزیشن نمونه‌برداری کنید") else tr("Color sampled", "رنگ نمونه‌برداری شد")
+            state.message = if (state.isFa) { if (sampled == null) "داخل محدودهٔ کامپوزیشن نمونه‌برداری کنید" else "رنگ نمونه‌برداری شد" } else { if (sampled == null) "Tap inside the composition" else "Color sampled" }
             state.changed()
             return@awaitEachGesture
         }

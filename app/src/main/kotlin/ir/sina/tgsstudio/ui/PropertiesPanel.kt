@@ -319,7 +319,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
                 }
                 state.eyedropperActive = true
                 picking = null
-                state.message = tr("Tap a color on the composition", "روی رنگ موردنظر در بوم بزنید")
+                state.message = if (state.isFa) "روی رنگ موردنظر در بوم بزنید" else "Tap a color on the composition"
             },
         )
     }
