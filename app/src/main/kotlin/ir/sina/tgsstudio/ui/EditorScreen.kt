@@ -182,7 +182,10 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 if (wide) {
                     Column(Modifier.fillMaxSize()) {
                         Box(Modifier.weight(1f).fillMaxWidth()) { CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) }) }
-                        Column(Modifier.height(216.dp).fillMaxWidth().background(StudioColors.Panel)) { TimelinePanel(state) }
+                        Column(Modifier.height(state.panelHeightDp.dp.coerceAtLeast(150.dp)).fillMaxWidth().background(StudioColors.Panel)) {
+                            PanelHandle(state, maxPanel)
+                            Box(Modifier.weight(1f)) { TimelinePanel(state) }
+                        }
                     }
                 } else CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) })
 
@@ -305,6 +308,15 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                         state.toolsDrawerOpen = false
                     }
                     ToolDrawerAction(Ic.Fit, tr("Fit canvas", "برازش بوم")) { state.fit(state.fitSize.x, state.fitSize.y) }
+                    ToolGroupLabel(tr("Canvas guides", "راهنماهای بوم"))
+                    SmallButton(tr(if (state.showGrid) "Grid ✓" else "Grid", if (state.showGrid) "شبکه ✓" else "شبکه"), { state.setShowGrid(!state.showGrid) }, primary = state.showGrid, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                    SmallButton(tr(if (state.showRulers) "Rulers ✓" else "Rulers", if (state.showRulers) "خط‌کش ✓" else "خط‌کش"), { state.setShowRulers(!state.showRulers) }, primary = state.showRulers, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                    SmallButton(tr(if (state.snapToGrid) "Snap ✓" else "Snap to grid", if (state.snapToGrid) "چسبیدن ✓" else "چسبیدن به شبکه"), { state.setSnapToGrid(!state.snapToGrid) }, primary = state.snapToGrid, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SmallButton("−", { state.setGridSpacing(state.gridSpacing / 2f) }, modifier = Modifier.weight(1f))
+                        SmallButton("${state.gridSpacing.toInt()} px", {}, modifier = Modifier.weight(2f))
+                        SmallButton("+", { state.setGridSpacing(state.gridSpacing * 2f) }, modifier = Modifier.weight(1f))
+                    }
                     Text(
                         "${(state.viewScale / (minOf(state.fitSize.x / state.session.doc.width, state.fitSize.y / state.session.doc.height).coerceAtLeast(0.0001f) * 0.92f) * 100).toInt()}%",
                         color = StudioColors.TextMuted, fontSize = 11.sp,
