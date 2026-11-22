@@ -299,6 +299,8 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ARC, Ic.Draw, tr("Arc", "کمان"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SPIRAL, Ic.Draw, tr("Spiral", "مارپیچ"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Freehand drawing", "طراحی آزاد"), "drawing" in expandedToolGroups) { toggleToolGroup("drawing") }
                     if ("drawing" in expandedToolGroups) {
@@ -515,7 +517,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
-        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON)) {
+        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
@@ -533,6 +535,14 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 Tool.ROUNDED_RECT -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Text(tr("Corner radius: ${fmt(state.rectRoundness.toDouble(), 0)} px", "شعاع گوشه: ${fmt(state.rectRoundness.toDouble(), 0)} پیکسل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {})
+                }
+                Tool.ARC -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Arc angle: ${state.arcDegrees}°", "زاویه کمان: ${state.arcDegrees}°"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    GestureSlider(state.arcDegrees.toFloat(), 30f..360f, {}, { state.arcDegrees = it.toInt().coerceIn(30, 360) }, {})
+                }
+                Tool.SPIRAL -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Turns: ${state.spiralTurns}", "تعداد دور: ${state.spiralTurns}"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    GestureSlider(state.spiralTurns.toFloat(), 1f..6f, {}, { state.spiralTurns = it.toInt().coerceIn(1, 6) }, {})
                 }
                 else -> Unit
             }
