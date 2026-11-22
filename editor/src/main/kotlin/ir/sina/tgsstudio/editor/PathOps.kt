@@ -69,6 +69,28 @@ object PathOps {
         return Bezier(b.closed, b.v, ins, outs)
     }
 
+    /**
+     * Reverses path direction without changing its geometry. Incoming and outgoing handles
+     * are swapped because their meaning changes when traversal direction is inverted.
+     */
+    fun reverse(b: Bezier): Bezier {
+        val n = b.count
+        if (n < 2) return b
+        val v = DoubleArray(b.v.size)
+        val ins = DoubleArray(b.inT.size)
+        val outs = DoubleArray(b.outT.size)
+        for (i in 0 until n) {
+            val source = n - 1 - i
+            v[2 * i] = b.v[2 * source]
+            v[2 * i + 1] = b.v[2 * source + 1]
+            ins[2 * i] = b.outT[2 * source]
+            ins[2 * i + 1] = b.outT[2 * source + 1]
+            outs[2 * i] = b.inT[2 * source]
+            outs[2 * i + 1] = b.inT[2 * source + 1]
+        }
+        return Bezier(b.closed, v, ins, outs)
+    }
+
     fun setClosed(b: Bezier, closed: Boolean) = Bezier(closed, b.v, b.inT, b.outT)
 
     private fun cubicOf(b: Bezier, seg: Int): Cubic {
