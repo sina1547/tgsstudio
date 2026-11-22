@@ -377,33 +377,68 @@ private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: Str
                     if (hitRow >= 0) {
                         val hit = hitRow to hitKey
                         if (state.multiKeyframeMode) {
-                            val nextSelection = if (hit in state.selectedKeys) state.selectedKeys - hit else state.selectedKeys + hit
-                            state.selectedKeys = nextSelection
-                            state.selectedKey = if (hit in nextSelection) hit else nextSelection.lastOrNull()
+                            // Keep the whole selection intact while dragging any selected diamond.
+                            val group = if (hit in state.selectedKeys) state.selectedKeys else state.selectedKeys + hit
+                            state.selectedKeys = group
+                            state.selectedKey = hit
+                            state.changed()
+                            val primaryObject = KeyframeOps.list(activeRows[hitRow].prop).getOrNull(hitKey)
+                            var currentSelection = group
+                            var lastX = down.position.x
+                            var gestureStarted = false
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.first()
+                                if (ch.changedToUp()) { ch.consume(); break }
+                                val step = Math.rint((ch.position.x - lastX) / ppf)
+                                lastX = ch.position.x
+                                if (step != 0.0) {
+                                    val allowed = clampKeyframeGroupDelta(
+                                        activeRows, currentSelection, step, ip, doc.outPoint
+                                    )
+                                    if (allowed != 0.0) {
+                                        if (!gestureStarted) {
+                                            state.session.beginGesture("Move selected keyframes")
+                                            gestureStarted = true
+                                        }
+                                        currentSelection = moveKeyframeGroup(activeRows, currentSelection, allowed)
+                                        state.selectedKeys = currentSelection
+                                        val primaryIndex = primaryObject?.let { obj ->
+                                            KeyframeOps.list(activeRows[hitRow].prop).indexOfFirst { it === obj }
+                                        } ?: -1
+                                        state.selectedKey = if (primaryIndex >= 0) hitRow to primaryIndex else currentSelection.firstOrNull()
+                                        state.changed()
+                                    }
+                                }
+                                ch.consume()
+                            }
+                            if (gestureStarted) state.session.endGesture()
+                            state.selectedKeys = currentSelection
+                            state.changed()
                         } else {
                             state.selectedKey = hit
                             state.selectedKeys = setOf(hit)
-                        }
-                        state.changed()
-                        state.session.beginGesture("Move keyframe")
-                        var moved = false
-                        var curIndex = hitKey
-                        while (true) {
-                            val ev = awaitPointerEvent(); val ch = ev.changes.first()
-                            if (ch.changedToUp()) { ch.consume(); break }
-                            val f = Math.rint(frameAt(ch.position.x))
-                            val t0 = KeyframeOps.times(activeRows[hitRow].prop).getOrNull(curIndex) ?: break
-                            if (abs(f - t0) >= 1.0 && abs(ch.position.x - down.position.x) > 6f * density || moved) {
-                                moved = true
-                                val ni = KeyframeOps.move(activeRows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
-                                curIndex = ni
-                                state.selectedKey = hitRow to ni
-                                state.selectedKeys = setOf(hitRow to ni)
-                                state.changed()
+                            state.changed()
+                            state.session.beginGesture("Move keyframe")
+                            var moved = false
+                            var curIndex = hitKey
+                            while (true) {
+                                val ev = awaitPointerEvent(); val ch = ev.changes.first()
+                                if (ch.changedToUp()) { ch.consume(); break }
+                                val f = Math.rint(frameAt(ch.position.x))
+                                val t0 = KeyframeOps.times(activeRows[hitRow].prop).getOrNull(curIndex) ?: break
+                                if (abs(f - t0) >= 1.0 && abs(ch.position.x - down.position.x) > 6f * density || moved) {
+                                    moved = true
+                                    val ni = KeyframeOps.move(activeRows[hitRow].prop, curIndex, f.coerceIn(ip, doc.outPoint))
+                                    curIndex = ni
+                                    state.selectedKey = hitRow to ni
+                                    state.selectedKeys = setOf(hitRow to ni)
+                                    state.changed()
+                                }
+                                ch.consume()
                             }
-                            ch.consume()
+                            state.session.endGesture(); state.changed()
                         }
-                        state.session.endGesture(); state.changed()
                     } else {
                         // scrub the playhead
                         state.playing = false
@@ -506,4 +541,72 @@ private fun KeyframeBar(state: EditorState, entry: PropEntry, index: Int) {
             }
         }
     }
+}
+
+
+/** Clamp a group drag so selected keyframes cannot collide with unselected keys in any property row. */
+private fun clampKeyframeGroupDelta(
+    rows: List<PropEntry>,
+    selection: Set<Pair<Int, Int>>,
+    requested: Double,
+    minFrame: Double,
+    maxFrame: Double,
+): Double {
+    if (requested == 0.0) return 0.0
+    var allowed = requested
+    selection.groupBy({ it.first }, { it.second }).forEach { (row, selectedIndices) ->
+        val prop = rows.getOrNull(row)?.prop ?: return@forEach
+        val times = KeyframeOps.times(prop)
+        val selected = selectedIndices.toSet()
+        selectedIndices.forEach { index ->
+            val time = times.getOrNull(index) ?: return@forEach
+            if (requested > 0.0) {
+                val nextUnselected = times.indices.asSequence()
+                    .filter { it !in selected }
+                    .map { times[it] }
+                    .filter { it > time + 0.5 }
+                    .minOrNull()
+                val boundary = nextUnselected?.minus(1.0) ?: maxFrame
+                allowed = minOf(allowed, boundary - time)
+            } else {
+                val previousUnselected = times.indices.asSequence()
+                    .filter { it !in selected }
+                    .map { times[it] }
+                    .filter { it < time - 0.5 }
+                    .maxOrNull()
+                val boundary = previousUnselected?.plus(1.0) ?: minFrame
+                allowed = maxOf(allowed, boundary - time)
+            }
+        }
+    }
+    return allowed.toInt().toDouble()
+}
+
+/** Move selected keyframe objects as one group, preserving their identities as their indices change. */
+private fun moveKeyframeGroup(
+    rows: List<PropEntry>,
+    selection: Set<Pair<Int, Int>>,
+    delta: Double,
+): Set<Pair<Int, Int>> {
+    if (delta == 0.0) return selection
+    val movedSelection = linkedSetOf<Pair<Int, Int>>()
+    selection.groupBy({ it.first }, { it.second }).forEach { (row, indices) ->
+        val prop = rows.getOrNull(row)?.prop ?: return@forEach
+        val objects = indices.distinct().mapNotNull { index ->
+            KeyframeOps.list(prop).getOrNull(index)?.let { index to it }
+        }
+        val ordered = if (delta > 0.0) objects.sortedByDescending { it.first } else objects.sortedBy { it.first }
+        ordered.forEach { (_, keyframe) ->
+            val currentIndex = KeyframeOps.list(prop).indexOfFirst { it === keyframe }
+            if (currentIndex >= 0) {
+                val currentTime = KeyframeOps.times(prop).getOrNull(currentIndex)
+                if (currentTime != null) KeyframeOps.move(prop, currentIndex, currentTime + delta)
+            }
+        }
+        objects.forEach { (_, keyframe) ->
+            val newIndex = KeyframeOps.list(prop).indexOfFirst { it === keyframe }
+            if (newIndex >= 0) movedSelection += row to newIndex
+        }
+    }
+    return movedSelection
 }
