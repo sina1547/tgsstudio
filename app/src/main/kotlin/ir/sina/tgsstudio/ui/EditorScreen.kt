@@ -151,7 +151,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     if (result == null || result.groups.isEmpty()) unsupported++ else imported++
                 }.onFailure { failed++ }
             }
-            state.openRightPanel(PanelTab.PROPERTIES)
+            state.updatePanel(PanelTab.PROPERTIES)
             state.message = if (lang == Lang.FA) {
                 "$imported فایل SVG وارد شد؛ $unsupported بدون شکل برداری؛ $failed خطا"
             } else {
@@ -183,7 +183,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         when {
             state.previewMode -> { state.previewMode = false; state.playing = false }
             state.penPath != null -> { state.penPath = null; state.changed() }
-            state.rightPanelOpen -> state.rightPanelOpen = false
             state.panel != null -> state.updatePanel(null)
             state.tool != Tool.SELECT -> { state.tool = Tool.SELECT; state.changed() }
             state.dirty -> showLeave = true
@@ -248,7 +247,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     val centerY = doc.height / 2.0
     fun finishAdd() {
         state.tool = Tool.SELECT
-        state.openRightPanel(PanelTab.PROPERTIES)
+        state.updatePanel(PanelTab.PROPERTIES)
     }
     fun addObject(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) {
         state.act(block)
@@ -364,37 +363,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
             }
         }
 
-        Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
-                .width(if (state.rightPanelOpen) 276.dp else 46.dp)
-                .then(if (state.rightPanelOpen) Modifier.fillMaxHeight(0.82f).heightIn(max = 620.dp) else Modifier.heightIn(min = 96.dp, max = 180.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(StudioColors.Panel.copy(alpha = 0.97f))
-                .padding(5.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (state.rightPanelOpen) {
-                Row(Modifier.fillMaxWidth().padding(start = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (state.rightPanelTab == PanelTab.LAYERS) Ic.Layers else Ic.Props, StudioColors.Accent, 19.dp)
-                    Text(
-                        if (state.rightPanelTab == PanelTab.LAYERS) tr("Layers", "لایه‌ها") else tr("Properties", "ویژگی‌ها"),
-                        color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp),
-                    )
-                    IconBtn(Ic.Chevron, { state.rightPanelOpen = false }, size = 36.dp, iconSize = 18.dp)
-                }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    IconBtn(Ic.Layers, { state.rightPanelTab = PanelTab.LAYERS }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 19.dp)
-                    IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 19.dp)
-                }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    if (state.rightPanelTab == PanelTab.LAYERS) LayersPanel(state) else PropertiesPanel(state)
-                }
-            } else {
-                IconBtn(Ic.Layers, { state.openRightPanel(PanelTab.LAYERS) }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 21.dp)
-                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
-            }
-        }
+
     }
 }
 
@@ -636,7 +605,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Copy, { state.act { duplicateSelection() } }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Up, { sel.singleOrNull()?.let { t -> state.act { move(t, -1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Down, { sel.singleOrNull()?.let { t -> state.act { move(t, 1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
-                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
+                IconBtn(Ic.Props, { state.updatePanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
