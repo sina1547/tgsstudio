@@ -193,7 +193,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
         // This prevents the composition from jumping or being re-fitted when panels are opened.
-        val workspacePanelHeight = (maxHeight * 0.40f).coerceIn(240.dp, 360.dp)
+        val maxWorkspaceHeight = (maxHeight * 0.62f).coerceAtLeast(240.dp)
+        val workspacePanelHeight = state.panelHeightDp.dp.coerceIn(240.dp, maxWorkspaceHeight)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -213,6 +214,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                         .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                         .background(StudioColors.Panel)
                 ) {
+                    PanelHandle(state, maxWorkspaceHeight.value)
                     PanelTabBar(state)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when (state.panel ?: PanelTab.TIMELINE) {
@@ -298,21 +300,21 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     if ("paths" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ADD_NODE, Ic.Add, tr("Add Anchor Point", "افزودن نقطه اتصال"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.DELETE_NODE, Ic.Trash, tr("Delete Anchor Point", "حذف نقطه اتصال"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.SMOOTH_NODE, Ic.Draw, tr("Smooth Point", "نقطه منحنی"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.CORNER_NODE, Ic.Node, tr("Corner Point", "نقطه گوشه"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ADD_NODE, Ic.AddNode, tr("Add Anchor Point", "افزودن نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.DELETE_NODE, Ic.DeleteNode, tr("Delete Anchor Point", "حذف نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SMOOTH_NODE, Ic.SmoothNode, tr("Smooth Point", "نقطه منحنی"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.CORNER_NODE, Ic.CornerNode, tr("Corner Point", "نقطه گوشه"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.LINE, Ic.Line, tr("Line", "خط"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
                     if ("shapes" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.Rect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ARC, Ic.Draw, tr("Arc", "کمان"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.SPIRAL, Ic.Draw, tr("Spiral", "مارپیچ"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ARC, Ic.Arc, tr("Arc", "کمان"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SPIRAL, Ic.Spiral, tr("Spiral", "مارپیچ"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Freehand drawing", "طراحی آزاد"), "drawing" in expandedToolGroups) { toggleToolGroup("drawing") }
                     if ("drawing" in expandedToolGroups) {
@@ -528,6 +530,19 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
+        if (state.tool == Tool.SELECT) {
+            Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(tr("Selection", "انتخاب"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                SmallButton(tr(if (state.multiSelect) "Multi-select ✓" else "Multi-select", if (state.multiSelect) "انتخاب چندگانه ✓" else "انتخاب چندگانه"), { state.multiSelect = !state.multiSelect }, primary = state.multiSelect)
+                SmallButton(tr(if (state.snapToGrid) "Snap ✓" else "Snap", if (state.snapToGrid) "چسبیدن ✓" else "چسبیدن"), { state.persistSnapToGrid(!state.snapToGrid) }, primary = state.snapToGrid)
+            }
+        }
+        if (state.tool == Tool.HAND) {
+            Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("Canvas navigation", "ناوبری بوم"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                SmallButton(tr("Fit canvas", "برازش بوم"), { state.fit(state.fitSize.x, state.fitSize.y) }, ic = Ic.Fit)
+            }
+        }
         if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
@@ -577,7 +592,8 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(if (pen == null) tr("Tap to place points; drag to curve. Tap the first point to close.", "برای گذاشتن نقطه بزنید؛ برای منحنی بکشید. برای بستن، نقطهٔ اول را بزنید.") else tr("${pen.count} points", "${pen.count} نقطه"), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp).align(Alignment.CenterVertically))
                     if (pen != null) {
                         SmallButton(tr("Done", "پایان"), { state.act { addFreeform(pen, filled = false) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, primary = true, enabled = pen.count >= 2)
-                        SmallButton(tr("Close", "بستن"), { state.act { addFreeform(PathOps.setClosed(pen, true)) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, enabled = pen.count >= 3)
+                        SmallButton(tr(if (state.penFill) "Fill on close ✓" else "Fill on close", if (state.penFill) "پرکردن هنگام بستن ✓" else "پرکردن هنگام بستن"), { state.penFill = !state.penFill }, primary = state.penFill, enabled = pen.count >= 3)
+                        SmallButton(tr("Close", "بستن"), { state.act { addFreeform(PathOps.setClosed(pen, true), filled = state.penFill) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, enabled = pen.count >= 3)
                         SmallButton(tr("Cancel", "انصراف"), { state.penPath = null; state.changed() })
                     }
                 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,16 @@ fun TimelinePanel(state: EditorState) {
     val totalFrames = (doc.outPoint - doc.inPoint).coerceAtLeast(1.0)
     val contentWidthDp = (totalFrames * ppf / density).toFloat().dp + 40.dp
     val hScroll = rememberScrollState()
+    LaunchedEffect(state.frame, ppf) {
+        val playheadPx = ((state.frame - doc.inPoint) * ppf).toInt().coerceAtLeast(0)
+        val viewport = hScroll.viewportSize
+        val visibleLeft = hScroll.value
+        val visibleRight = visibleLeft + viewport
+        if (viewport > 0 && (playheadPx < visibleLeft || playheadPx > visibleRight - 48)) {
+            val target = (playheadPx - (viewport * 0.62f).toInt()).coerceAtLeast(0)
+            hScroll.animateScrollTo(target)
+        }
+    }
 
     Ltr {
         Column(Modifier.fillMaxWidth()) {

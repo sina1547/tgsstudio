@@ -107,6 +107,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var penWidth by mutableFloatStateOf(8f)
     var penOpacity by mutableFloatStateOf(100f)
     var penWriteOn by mutableStateOf(false)
+    var penFill by mutableStateOf(false)
     var penSpeed by mutableFloatStateOf(10f)          // pixels of path drawn per frame during write-on
     var drawPoints by mutableStateOf<List<Offset>>(emptyList())
     var penNextStart: Double? = null
