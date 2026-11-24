@@ -3,6 +3,7 @@ package ir.sina.tgsstudio.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -100,6 +103,16 @@ fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss:
 
 @Composable
 fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: String, onThemeChange: (String) -> Unit, accent: String, onAccentChange: (String) -> Unit, onDismiss: () -> Unit) {
+    var themeMenuExpanded by remember { mutableStateOf(false) }
+    val themeOptions = listOf(
+        "dark" to tr("Dark", "تیره"),
+        "light" to tr("Light", "روشن"),
+        "neon" to "Neon",
+        "custom" to tr("Custom", "سفارشی"),
+    )
+    val selectedTheme = themeOptions.firstOrNull { it.first == currentTheme }?.second
+        ?: tr("Dark", "تیره")
+
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { DialogTitle(tr("Settings", "تنظیمات")) },
@@ -114,12 +127,30 @@ fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: St
                     ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (current == code) Icon(Ic.Check, Color.White, 18.dp) }
                 }
                 Text(tr("Workspace theme", "تم محیط"), color = StudioColors.TextMuted, fontSize = 13.sp)
-                listOf("dark" to tr("Dark", "تیره"), "light" to tr("Light", "روشن"), "neon" to "Neon", "custom" to tr("Custom", "سفارشی")).forEach { (code, label) ->
+                Box(Modifier.fillMaxWidth()) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (currentTheme == code) StudioColors.AccentSoft else StudioColors.PanelRaised)
-                            .clickable { onThemeChange(code) }.padding(12.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(StudioColors.PanelRaised)
+                            .clickable { themeMenuExpanded = true }
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                    ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (currentTheme == code) Icon(Ic.Check, Color.White, 18.dp) }
+                    ) {
+                        Text(tr("Theme", "پوسته"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
+                        Text(selectedTheme, color = StudioColors.Accent, fontSize = 13.sp)
+                        Text("  ▾", color = StudioColors.TextMuted, fontSize = 14.sp)
+                    }
+                    DropdownMenu(
+                        expanded = themeMenuExpanded,
+                        onDismissRequest = { themeMenuExpanded = false },
+                    ) {
+                        themeOptions.forEach { (code, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = StudioColors.TextPrimary) },
+                                leadingIcon = { if (currentTheme == code) Icon(Ic.Check, StudioColors.Accent, 18.dp) },
+                                onClick = { onThemeChange(code); themeMenuExpanded = false },
+                            )
+                        }
+                    }
                 }
                 if (currentTheme == "custom") {
                     OutlinedTextField(
