@@ -287,7 +287,7 @@ private fun HomeWorkspace(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            BottomNavEmojiItem("🏠", tr("Home", "خانه"), !projectsTab) { projectsTab = false; query = "" }
+            BottomNavItem(Ic.Home, tr("Home", "خانه"), !projectsTab) { projectsTab = false; query = "" }
             BottomNavItem(Ic.Layers, tr("Projects", "پروژه‌ها"), projectsTab) { projectsTab = true; query = "" }
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Box {
@@ -346,17 +346,6 @@ private fun BottomNavItem(icon: Ic, title: String, selected: Boolean, onClick: (
     }
 }
 
-@Composable
-private fun BottomNavEmojiItem(emoji: String, title: String, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier.width(66.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Text(emoji, color = if (selected) StudioColors.Accent else StudioColors.TextMuted, fontSize = 20.sp)
-        Text(title, color = if (selected) StudioColors.Accent else StudioColors.TextMuted, fontSize = 9.sp, maxLines = 1)
-    }
-}
 
 @Composable
 private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int, Double, String) -> Unit) {
