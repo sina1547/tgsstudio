@@ -64,7 +64,8 @@ fun issueText(i: Issue): String = when (i.code) {
     else -> i.code
 }
 
-enum class ExportKind(val mime: String, val ext: String) { TGS("application/gzip", "tgs"), JSON("application/json", "json"), SVG("image/svg+xml", "svg") }
+// Keep TGS as a .tgs filename in Android SAF; application/gzip may cause providers to append .gz.
+enum class ExportKind(val mime: String, val ext: String) { TGS("application/octet-stream", "tgs"), JSON("application/json", "json"), SVG("image/svg+xml", "svg") }
 
 /** Checks the document against Telegram's sticker limits, shows every problem, and lets the user export anyway. */
 @Composable
