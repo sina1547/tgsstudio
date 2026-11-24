@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.sina.tgsstudio.BuildConfig
@@ -171,6 +172,7 @@ fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: St
 
 @Composable
 fun AboutDialog(onDismiss: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { DialogTitle("SINA TGS Studio") },
@@ -178,6 +180,16 @@ fun AboutDialog(onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tr("Version ${BuildConfig.VERSION_NAME}", "نسخهٔ ${BuildConfig.VERSION_NAME}"), color = StudioColors.TextMuted)
                 Text(tr("An offline editor for Telegram animated stickers (TGS). Everything runs on your phone; no account or internet is needed.", "ویرایشگر آفلاین استیکرهای متحرک تلگرام (TGS). همه‌چیز روی گوشی شما اجرا می‌شود؛ حساب کاربری یا اینترنت لازم نیست."), color = StudioColors.TextPrimary, fontSize = 14.sp)
+                Text(
+                    "✉  sinalatifi1547@gmail.com",
+                    color = StudioColors.Accent,
+                    modifier = androidx.compose.ui.Modifier.clickable { uriHandler.openUri("mailto:sinalatifi1547@gmail.com") },
+                )
+                Text(
+                    "Telegram  @sinalatifi1",
+                    color = StudioColors.Accent,
+                    modifier = androidx.compose.ui.Modifier.clickable { uriHandler.openUri("https://t.me/sinalatifi1") },
+                )
             }
         },
         confirmButton = { TextButton(onDismiss) { Text(tr("Close", "بستن"), color = StudioColors.Accent) } },
