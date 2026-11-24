@@ -208,6 +208,11 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
             }
 
             if (!state.previewMode) {
+                QuickActionBar(
+                    state = state,
+                    onText = { showText = true },
+                    onMedia = { svgPicker.launch(arrayOf("*/*")) },
+                )
                 Ltr { PlaybackBar(state) }
                 Column(
                     Modifier.fillMaxWidth().height(workspacePanelHeight)
@@ -625,6 +630,56 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
+    }
+}
+
+@Composable
+private fun QuickActionBar(state: EditorState, onText: () -> Unit, onMedia: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).background(StudioColors.Background)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        QuickAction(Ic.Tools, tr("Add", "افزودن"), state.toolsDrawerOpen, Modifier.weight(1f)) {
+            state.toolsDrawerOpen = !state.toolsDrawerOpen
+        }
+        QuickAction(Ic.Text, tr("Text", "متن"), false, Modifier.weight(1f), onText)
+        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
+            state.tool = Tool.RECT
+            state.toolsDrawerOpen = false
+            state.changed()
+        }
+        QuickAction(Ic.Effects, tr("Effects", "افکت"), state.panel == PanelTab.EFFECTS, Modifier.weight(1f)) {
+            state.updatePanel(PanelTab.EFFECTS)
+        }
+        QuickAction(Ic.Svg, tr("Media", "رسانه"), false, Modifier.weight(1f), onMedia)
+    }
+}
+
+@Composable
+private fun QuickAction(
+    icon: Ic,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier.clip(RoundedCornerShape(10.dp))
+            .background(if (selected) StudioColors.AccentSoft else StudioColors.Panel)
+            .clickable(onClick = onClick)
+            .padding(vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, if (selected) StudioColors.Accent else StudioColors.TextPrimary, 19.dp)
+        Text(
+            label,
+            color = if (selected) StudioColors.Accent else StudioColors.TextMuted,
+            fontSize = 9.sp,
+            maxLines = 1,
+        )
     }
 }
 
