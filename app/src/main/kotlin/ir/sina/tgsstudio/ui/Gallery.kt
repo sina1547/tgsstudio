@@ -65,7 +65,7 @@ fun Logo(size: androidx.compose.ui.unit.Dp) {
 fun GalleryScreen(
     store: ProjectStore, refresh: Int, setting: String,
     onOpen: (ProjectInfo) -> Unit, onNew: (String, Int, Int, Double, String) -> Unit, onImport: () -> Unit,
-    onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onLanguage: (String) -> Unit,
+    onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onDeleteSelected: (List<ProjectInfo>) -> Unit, onDuplicate: (ProjectInfo) -> Unit, onExport: (ProjectInfo, String) -> Unit, onLanguage: (String) -> Unit,
     themeSetting: String, accent: String, onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit,
 ) {
     val projects = remember(refresh) { store.list() }
@@ -83,6 +83,10 @@ fun GalleryScreen(
         onImport = onImport,
         onSettings = { showSettings = true },
         onAbout = { showAbout = true },
+        onDelete = { deleting = it },
+        onDeleteSelected = onDeleteSelected,
+        onDuplicate = onDuplicate,
+        onExport = onExport,
     )
 
     if (showNew) NewProjectDialog({ showNew = false }) { n, w, h, fps, bg -> showNew = false; onNew(n, w, h, fps, bg) }
@@ -101,21 +105,29 @@ private fun HomeWorkspace(
     onImport: () -> Unit,
     onSettings: () -> Unit,
     onAbout: () -> Unit,
+    onDelete: (ProjectInfo) -> Unit,
+    onDeleteSelected: (List<ProjectInfo>) -> Unit,
+    onDuplicate: (ProjectInfo) -> Unit,
+    onExport: (ProjectInfo, String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    var showAll by remember { mutableStateOf(false) }
+    var projectsTab by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
+    var showBulkDelete by remember { mutableStateOf(false) }
     val filtered = remember(projects, query) {
         if (query.isBlank()) projects else projects.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }
-    val visible = if (showAll) filtered else filtered.take(6)
+    val visible = filtered.take(6)
+    val selectedProjects = projects.filter { it.id in selectedIds }
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()) }
 
     Box(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 112.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -139,25 +151,26 @@ private fun HomeWorkspace(
                     leadingIcon = { Icon(Ic.Tools, StudioColors.TextMuted, 19.dp) },
                 )
             }
-            item {
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                        .background(Brush.linearGradient(listOf(StudioColors.PanelRaised, StudioColors.Panel, StudioColors.AccentSoft)))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(tr("Import Center", "مرکز ورود فایل"), color = StudioColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                            Text(tr("Bring your creative files into one workspace", "فایل‌های طراحی و انیمیشن را وارد فضای کاری کنید"), color = StudioColors.TextMuted, fontSize = 11.sp)
+            if (selectionMode) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            tr("${selectedIds.size} selected", "${selectedIds.size} مورد انتخاب شده"),
+                            color = StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { selectedIds = visible.map { it.id }.toSet() }) {
+                            Text(tr("Select all", "انتخاب همه"), color = StudioColors.Accent, fontSize = 11.sp)
                         }
-                        Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(StudioColors.AccentSoft), contentAlignment = Alignment.Center) {
-                            Icon(Ic.Folder, StudioColors.Accent, 23.dp)
+                        TextButton(onClick = { selectedIds = emptySet(); selectionMode = false }) {
+                            Text(tr("Cancel", "لغو"), color = StudioColors.TextMuted, fontSize = 11.sp)
                         }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        SmallButton(tr("Open TGS", "باز کردن TGS"), onImport, Modifier.weight(1f).height(42.dp), primary = true, ic = Ic.Folder)
-                        SmallButton(tr("New Project", "پروژه جدید"), onNew, Modifier.weight(1f).height(42.dp), ic = Ic.Plus)
+                        TextButton(enabled = selectedIds.isNotEmpty(), onClick = { showBulkDelete = true }) {
+                            Text(tr("Delete", "حذف"), color = if (selectedIds.isNotEmpty()) Color(0xFFFF6B6B) else StudioColors.TextMuted, fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -165,10 +178,13 @@ private fun HomeWorkspace(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(tr("Recent Projects", "پروژه‌های اخیر"), color = StudioColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                        Text(tr("Continue where you left off", "ادامه کارهای قبلی"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                        Text(tr("Showing up to 6 projects", "نمایش حداکثر ۶ پروژه"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     }
-                    TextButton(onClick = { showAll = !showAll }) {
-                        Text(if (showAll) tr("Show recent", "نمایش اخیر") else tr("See all", "همه"), color = StudioColors.Accent, fontSize = 12.sp)
+                    if (!selectionMode) {
+                        TextButton(onClick = { selectionMode = true; selectedIds = emptySet() }) {
+                            Icon(Ic.Select, StudioColors.Accent, 16.dp)
+                            Text(tr("Select", "انتخاب"), color = StudioColors.Accent, fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -185,44 +201,81 @@ private fun HomeWorkspace(
                     }
                 }
             } else {
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-                        items(visible, key = { it.id }) { project ->
-                            val bitmap = remember(project.id, project.modified) {
-                                store.thumbnail(project.id)?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }
+                items(visible, key = { it.id }) { project ->
+                    val bitmap = remember(project.id, project.modified) {
+                        store.thumbnail(project.id)?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }
+                    }
+                    var itemMenu by remember(project.id) { mutableStateOf(false) }
+                    var exportMenu by remember(project.id) { mutableStateOf(false) }
+                    val selected = project.id in selectedIds
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(StudioColors.Panel)
+                            .clickable(enabled = !selectionMode) { onOpen(project) }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    ) {
+                        if (selectionMode) {
+                            Checkbox(checked = selected, onCheckedChange = { checked ->
+                                selectedIds = if (checked) selectedIds + project.id else selectedIds - project.id
+                            })
+                        }
+                        Box(
+                            Modifier.size(width = 88.dp, height = 68.dp).clip(RoundedCornerShape(10.dp))
+                                .background(Brush.linearGradient(listOf(StudioColors.CheckerA, StudioColors.CheckerB))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+                            else Icon(Ic.Shape, StudioColors.TextMuted, 29.dp)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(project.name, color = StudioColors.TextPrimary, fontSize = 13.sp, maxLines = 1, fontWeight = FontWeight.SemiBold)
+                            Text(dateFormat.format(Date(project.modified)), color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1)
+                            Text(tr("TGS Studio project", "پروژه TGS Studio"), color = StudioColors.Accent, fontSize = 9.sp)
+                        }
+                        Box {
+                            IconBtn(Ic.More, { itemMenu = true }, size = 34.dp, iconSize = 18.dp)
+                            DropdownMenu(expanded = itemMenu, onDismissRequest = { itemMenu = false }, containerColor = StudioColors.PanelRaised) {
+                                DropdownMenuItem(
+                                    text = { Text(tr("Select", "انتخاب"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Select, StudioColors.Accent, 18.dp) },
+                                    onClick = {
+                                        itemMenu = false
+                                        selectionMode = true
+                                        selectedIds = selectedIds + project.id
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Export", "خروجی گرفتن"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Export, StudioColors.Accent, 18.dp) },
+                                    onClick = { itemMenu = false; exportMenu = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Duplicate", "ایجاد کپی"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Copy, StudioColors.TextPrimary, 18.dp) },
+                                    onClick = { itemMenu = false; onDuplicate(project) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Delete", "حذف"), color = Color(0xFFFF6B6B)) },
+                                    leadingIcon = { Icon(Ic.Trash, Color(0xFFFF6B6B), 18.dp) },
+                                    onClick = { itemMenu = false; onDelete(project) },
+                                )
                             }
-                            Column(
-                                Modifier.width(174.dp).clip(RoundedCornerShape(16.dp)).background(StudioColors.Panel)
-                                    .clickable { onOpen(project) },
-                            ) {
-                                Box(
-                                    Modifier.fillMaxWidth().aspectRatio(1.22f)
-                                        .background(Brush.linearGradient(listOf(StudioColors.CheckerA, StudioColors.CheckerB))),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize().padding(9.dp), contentScale = ContentScale.Fit)
-                                    else Icon(Ic.Shape, StudioColors.TextMuted, 36.dp)
-                                    Box(Modifier.align(Alignment.TopEnd).padding(8.dp).clip(CircleShape).background(StudioColors.Background.copy(alpha = 0.72f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                        Text("TGS", color = StudioColors.Accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(project.name, color = StudioColors.TextPrimary, fontSize = 13.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                                    Text(dateFormat.format(Date(project.modified)), color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1)
+                            DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }, containerColor = StudioColors.PanelRaised) {
+                                listOf(
+                                    "tgs" to tr("Telegram TGS", "خروجی TGS"),
+                                    "json" to tr("Lottie JSON", "خروجی Lottie JSON"),
+                                    "svg" to tr("SVG frame", "فریم SVG"),
+                                    "project" to tr("TGS Studio Project (.tgsproj)", "پروژه قابل ویرایش (.tgsproj)"),
+                                ).forEach { (format, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label, color = StudioColors.TextPrimary, fontSize = 12.sp) },
+                                        onClick = { exportMenu = false; onExport(project, format) },
+                                    )
                                 }
                             }
                         }
                     }
-                }
-            }
-            item {
-                Text(tr("Quick Actions", "دسترسی سریع"), color = StudioColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction(Ic.Plus, tr("Create", "ساخت پروژه"), StudioColors.Accent, onNew, Modifier.weight(1f))
-                    QuickAction(Ic.Folder, tr("Import", "ورود فایل"), StudioColors.Violet, onImport, Modifier.weight(1f))
-                    QuickAction(Ic.Settings, tr("Workspace", "فضای کاری"), StudioColors.Green, onSettings, Modifier.weight(1f))
                 }
             }
         }
@@ -234,8 +287,8 @@ private fun HomeWorkspace(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            BottomNavItem(Ic.Shape, tr("Home", "خانه"), !showAll) { showAll = false; query = "" }
-            BottomNavItem(Ic.Layers, tr("Projects", "پروژه‌ها"), showAll) { showAll = true }
+            BottomNavItem(Ic.Shape, tr("Home", "خانه"), !projectsTab) { projectsTab = false; query = "" }
+            BottomNavItem(Ic.Layers, tr("Projects", "پروژه‌ها"), projectsTab) { projectsTab = true; query = "" }
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Box {
                     Box(
@@ -254,11 +307,6 @@ private fun HomeWorkspace(
                             leadingIcon = { Icon(Ic.Folder, StudioColors.Accent, 20.dp) },
                             onClick = { menuOpen = false; onImport() },
                         )
-                        DropdownMenuItem(
-                            text = { Text(tr("Import Center", "مرکز ورود فایل"), color = StudioColors.TextPrimary) },
-                            leadingIcon = { Icon(Ic.Export, StudioColors.Accent, 20.dp) },
-                            onClick = { menuOpen = false; onImport() },
-                        )
                     }
                 }
             }
@@ -266,19 +314,23 @@ private fun HomeWorkspace(
             BottomNavItem(Ic.Settings, tr("Settings", "تنظیمات"), false, onSettings)
         }
     }
-}
 
-@Composable
-private fun QuickAction(icon: Ic, title: String, tint: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).clickable(onClick = onClick).padding(vertical = 14.dp, horizontal = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(tint.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            Icon(icon, tint, 20.dp)
-        }
-        Text(title, color = StudioColors.TextPrimary, fontSize = 10.sp, maxLines = 1)
+    if (showBulkDelete) {
+        AlertDialog(
+            onDismissRequest = { showBulkDelete = false },
+            containerColor = StudioColors.Panel,
+            title = { Text(tr("Delete selected projects?", "پروژه‌های انتخاب‌شده حذف شوند؟"), color = StudioColors.TextPrimary) },
+            text = { Text(tr("This will permanently remove ${selectedIds.size} project(s) from this device.", "تعداد ${selectedIds.size} پروژه برای همیشه از این دستگاه حذف می‌شود."), color = StudioColors.TextMuted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteSelected(selectedProjects)
+                    selectedIds = emptySet()
+                    selectionMode = false
+                    showBulkDelete = false
+                }) { Text(tr("Delete", "حذف"), color = Color(0xFFFF6B6B)) }
+            },
+            dismissButton = { TextButton(onClick = { showBulkDelete = false }) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
+        )
     }
 }
 
