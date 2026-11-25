@@ -194,7 +194,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
         // This prevents the composition from jumping or being re-fitted when panels are opened.
         // The lower workspace has a fixed responsive height; it is not draggable.
-        val workspacePanelHeight = (maxHeight * 0.40f).coerceIn(120.dp, 190.dp)
+        val workspacePanelHeight = (maxHeight * 0.48f).coerceIn(160.dp, 300.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
