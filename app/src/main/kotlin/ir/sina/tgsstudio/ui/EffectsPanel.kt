@@ -1,5 +1,12 @@
 package ir.sina.tgsstudio.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -23,6 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +45,8 @@ import ir.sina.tgsstudio.editor.EffectKind
 import ir.sina.tgsstudio.editor.EffectNote
 import ir.sina.tgsstudio.editor.EffectParams
 import ir.sina.tgsstudio.editor.EffectPreset
+import kotlin.math.abs
+import kotlin.math.sin
 import ir.sina.tgsstudio.editor.EffectResult
 
 @Composable
@@ -117,6 +131,80 @@ private fun Chip(text: String, selected: Boolean, enabled: Boolean = true, onCli
     )
 }
 
+@Composable
+private fun EffectMotionPreview(effect: EffectKind) {
+    val transition = rememberInfiniteTransition(label = "effect-" + effect.id)
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(950, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "effect-preview-phase",
+    )
+    Canvas(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(8.dp)).background(StudioColors.PanelHigh)) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val wave = sin(phase * 6.28318f)
+        var scale = 1f
+        var alpha = 1f
+        var dx = 0f
+        var dy = 0f
+        var angle = 0f
+        when (effect) {
+            EffectKind.FADE_IN -> alpha = phase
+            EffectKind.FADE_OUT -> alpha = 1f - phase
+            EffectKind.ZOOM_IN -> scale = 0.55f + phase * 0.55f
+            EffectKind.ZOOM_OUT -> scale = 1.1f - phase * 0.55f
+            EffectKind.SHAKE -> dx = sin(phase * 25.13f) * size.width * 0.055f
+            EffectKind.BOUNCE -> dy = -abs(sin(phase * 3.14159f)) * size.height * 0.18f
+            EffectKind.PULSE -> scale = 0.78f + abs(wave) * 0.32f
+            EffectKind.ROTATE -> angle = phase * 360f
+            EffectKind.SCALE -> scale = 0.65f + phase * 0.65f
+            EffectKind.SLIDE_IN -> dx = (phase - 1f) * size.width * 0.22f
+            EffectKind.SLIDE_OUT -> dx = phase * size.width * 0.22f
+            EffectKind.OPACITY -> alpha = 0.18f + phase * 0.82f
+            EffectKind.FLOAT -> dy = wave * size.height * 0.12f
+            EffectKind.DRAW_ON, EffectKind.DRAW_OFF, EffectKind.GLOW, EffectKind.BLUR -> Unit
+        }
+        val w = 30f * scale
+        val h = 19f * scale
+        val left = cx - w / 2f + dx
+        val top = cy - h / 2f + dy
+        if (effect == EffectKind.GLOW) {
+            drawCircle(StudioColors.Accent.copy(alpha = 0.12f + phase * 0.22f), radius = 25f + phase * 7f, center = Offset(cx, cy))
+        }
+        if (effect == EffectKind.BLUR) {
+            for (i in 1..3) {
+                drawRoundRect(
+                    color = StudioColors.Accent.copy(alpha = 0.10f * (4 - i)),
+                    topLeft = Offset(left + (i - 2) * 4f, top),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(6f, 6f),
+                )
+            }
+        }
+        rotate(angle, pivot = Offset(cx, cy)) {
+            drawRoundRect(
+                color = StudioColors.Accent,
+                topLeft = Offset(left, top),
+                size = Size(w, h),
+                cornerRadius = CornerRadius(6f, 6f),
+                alpha = alpha.coerceIn(0.08f, 1f),
+            )
+        }
+        if (effect == EffectKind.DRAW_ON || effect == EffectKind.DRAW_OFF) {
+            val sweep = if (effect == EffectKind.DRAW_ON) 360f * phase else 360f * (1f - phase)
+            drawArc(
+                color = StudioColors.TextPrimary.copy(alpha = 0.85f),
+                startAngle = -90f,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = Offset(cx - 21f, cy - 21f),
+                size = Size(42f, 42f),
+                style = Stroke(width = 2.5f),
+            )
+        }
+    }
+}
 /** Ready-made effects: pick, tune, preview on the canvas, then keep. Stackable; custom presets can be saved. */
 @Composable
 fun EffectsPanel(state: EditorState) {
@@ -229,6 +317,7 @@ fun EffectsPanel(state: EditorState) {
                                             fontSize = 18.sp,
                                         )
                                     }
+                                    EffectMotionPreview(effect)
                                     Text(kindLabel(effect), color = if (effect.supported) StudioColors.TextPrimary else StudioColors.TextMuted, fontSize = 12.sp, maxLines = 2)
                                     if (!effect.supported) Text(tr("Not supported by TGS", "در TGS پشتیبانی نمی‌شود"), color = StudioColors.Warning, fontSize = 9.sp)
                                 }
