@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -123,9 +124,33 @@ fun EffectsPanel(state: EditorState) {
             Text(tr("Effects", "افکت‌ها"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp).weight(1f))
             Text(if (selection.isEmpty()) tr("Select a layer", "یک لایه انتخاب کنید") else tr("${selection.map { it.layer }.distinct().size} layer(s)", "${selection.map { it.layer }.distinct().size} لایه"), color = if (selection.isEmpty()) StudioColors.Warning else StudioColors.TextMuted, fontSize = 12.sp)
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            EffectKind.entries.forEach { k -> Chip(kindLabel(k), k == kind, k.supported) { discardPreview(state); kindId = k.id; params = k.defaults(fps, state.frame) } }
+        Text(tr("Choose an effect", "انتخاب افکت"), color = StudioColors.TextMuted, fontSize = 12.sp)
+        EffectKind.entries.chunked(2).forEach { rowKinds ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowKinds.forEach { k ->
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                            .background(if (k == kind) StudioColors.AccentSoft else StudioColors.PanelRaised)
+                            .clickable { discardPreview(state); kindId = k.id; params = k.defaults(fps, state.frame) }
+                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Ic.Effects, if (k == kind) StudioColors.Accent else StudioColors.TextMuted, 22.dp)
+                        Text(
+                            kindLabel(k),
+                            color = if (k == kind) StudioColors.Accent else if (k.supported) StudioColors.TextPrimary else StudioColors.TextMuted,
+                            fontSize = 11.sp, maxLines = 2,
+                        )
+                    }
+                }
+                if (rowKinds.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
+        Text(
+            "${tr("Selected effect", "افکت انتخاب‌شده")}: ${kindLabel(kind)}",
+            color = StudioColors.TextPrimary, fontSize = 14.sp,
+        )
         if (!kind.supported) {
             Text(tr("Blur is a layer effect, and Telegram's TGS format forbids layer effects, so it can't be added. Glow gives a similar soft halo.", "بلور یک افکت لایه است و فرمت TGS تلگرام افکت لایه را ممنوع کرده؛ پس قابل افزودن نیست. «درخشش» حالت هالهٔ نرم مشابهی می‌دهد."), color = StudioColors.Warning, fontSize = 13.sp)
         } else {
