@@ -194,7 +194,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
         // This prevents the composition from jumping or being re-fitted when panels are opened.
         // The lower workspace has a fixed responsive height; it is not draggable.
-        val workspacePanelHeight = (maxHeight * 0.48f).coerceIn(160.dp, 300.dp)
+        val workspacePanelHeight = (maxHeight * 0.44f).coerceIn(260.dp, 400.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -271,16 +271,16 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
         EditorCanvas(state)
         // Dock is anchored to the canvas edge; contextual controls stay inside this fixed overlay.
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
-                .width(if (toolsOpen) 184.dp else 48.dp)
-                .clip(RoundedCornerShape(16.dp))
+            Modifier.align(Alignment.CenterEnd).padding(end = 6.dp)
+                .width(if (toolsOpen) 168.dp else 44.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (toolsOpen) {
                 Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Ic.Tools, StudioColors.Accent, 19.dp)
+                    Icon(Ic.Tools, StudioColors.Accent, 21.dp)
                     Text(tr("Tools", "ابزارها"), color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
                     IconBtn(Ic.Chevron, { state.toolsDrawerOpen = false }, size = 36.dp, iconSize = 18.dp)
                 }
@@ -405,7 +405,7 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
             }.padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, if (active) StudioColors.Accent else StudioColors.TextPrimary, 19.dp)
+        Icon(icon, if (active) StudioColors.Accent else StudioColors.TextPrimary, 21.dp)
         Text(label, color = if (active) StudioColors.Accent else StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.padding(start = 9.dp))
         if (active) {
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
@@ -430,10 +430,10 @@ private fun ToolDrawerAction(icon: Ic, label: String, onClick: () -> Unit) {
 private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit) {
     val tick = state.tick
     Row(
-        Modifier.fillMaxWidth().height(52.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBtn(Ic.Back, onBack, size = 40.dp)
+        IconBtn(Ic.Back, onBack, size = 42.dp, iconSize = 22.dp)
         Column(
             Modifier.weight(1f).clickable(onClick = onRename).padding(start = 7.dp, end = 4.dp),
             verticalArrangement = Arrangement.Center,
@@ -448,7 +448,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
             )
         }
         Box(Modifier.width(1.dp).height(28.dp).background(StudioColors.Divider))
-        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 38.dp, iconSize = 19.dp)
+        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 40.dp, iconSize = 21.dp)
         IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 38.dp, iconSize = 19.dp)
         IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 38.dp, iconSize = 19.dp)
         IconBtn(Ic.Export, onExport, size = 38.dp, iconSize = 19.dp, tint = StudioColors.Accent)
@@ -688,12 +688,12 @@ private fun PlaybackBar(state: EditorState) {
     val doc = state.session.doc
     val lo = doc.inPoint.toFloat(); val hi = max(lo + 1f, (doc.outPoint - 1).toFloat())
     Row(
-        Modifier.fillMaxWidth().height(36.dp).background(StudioColors.Panel).padding(horizontal = 4.dp),
+        Modifier.fillMaxWidth().height(42.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 30.dp, iconSize = 15.dp)
-        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 32.dp, iconSize = 16.dp)
+        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 36.dp, iconSize = 19.dp)
+        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 38.dp, iconSize = 20.dp)
         IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 30.dp, iconSize = 15.dp)
         IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 30.dp, iconSize = 15.dp)
         Slider(
