@@ -66,8 +66,8 @@ import ir.sina.tgsstudio.editor.Spaces
 import kotlin.math.abs
 import kotlin.math.hypot
 
-private val LABEL_W = 132.dp
-private val ROW_H = 40.dp
+private val LABEL_W = 104.dp
+private val ROW_H = 44.dp
 
 /** Time-based editor for the keyframes of the selected element. Frames run left to right in both languages. */
 @Composable
@@ -151,8 +151,8 @@ fun TimelinePanel(state: EditorState) {
             val sk = state.selectedKey
             val selEntry = sk?.let { rows.getOrNull(it.first) }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 34.dp, iconSize = 17.dp)
-                NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(76.dp), decimals = 0, label = "F")
+                IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 38.dp, iconSize = 20.dp)
+                NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(64.dp), decimals = 0, label = "F")
                 IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
                 val selectedLayer = target as? LayerTarget
                 IconBtn(Ic.Split, {
@@ -246,8 +246,8 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
     val doc = state.session.doc
     val density = LocalDensity.current.density
     val ppf = state.timelinePxPerFrame
-    val rulerPx = 24f * density
-    val rowPx = 36f * density
+    val rulerPx = 28f * density
+    val rowPx = 42f * density
     fun selectLayer(index: Int) {
         val target = LayerTarget(LayerRef(null, index))
         val next = if (state.multiSelect) {
@@ -256,22 +256,22 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
         state.act { select(next) }
     }
 
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp)) {
         Row(
-            Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 9.dp),
+            Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Ic.Layers, StudioColors.Accent, 15.dp)
+            Icon(Ic.Layers, StudioColors.Accent, 18.dp)
             Text(tr("Layers", "لایه‌ها"), color = StudioColors.TextPrimary, fontSize = 11.sp, modifier = Modifier.padding(start = 6.dp).weight(1f))
             Text("${layers.size}", color = StudioColors.TextMuted, fontSize = 10.sp)
         }
-        Row(Modifier.fillMaxWidth().heightIn(max = 148.dp).verticalScroll(rememberScrollState())) {
+        Row(Modifier.fillMaxWidth().heightIn(max = 168.dp).verticalScroll(rememberScrollState())) {
             Column(Modifier.width(LABEL_W).background(StudioColors.PanelRaised)) {
                 Box(Modifier.height(24.dp))
                 layers.forEachIndexed { index, layer ->
                     val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
                     Row(
-                        Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 3.dp, vertical = 2.dp)
+                        Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 3.dp, vertical = 2.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(if (selected) StudioColors.AccentSoft else StudioColors.PanelHigh.copy(alpha = 0.45f))
                             .combinedClickable(onClick = { selectLayer(index) }, onLongClick = { selectLayer(index) })
@@ -281,8 +281,8 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         IconBtn(
                             if (layer.hidden) Ic.EyeOff else Ic.Eye,
                             { state.act { setHidden(LayerTarget(LayerRef(null, index)), !layer.hidden) } },
-                            size = 28.dp,
-                            iconSize = 15.dp,
+                            size = 32.dp,
+                            iconSize = 18.dp,
                             tint = if (layer.hidden) StudioColors.TextMuted else StudioColors.TextMuted,
                         )
                         Box(
@@ -292,7 +292,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         Text(
                             layer.name.ifBlank { "Layer ${index + 1}" },
                             color = if (selected) StudioColors.Accent else if (layer.hidden) StudioColors.TextMuted else StudioColors.TextPrimary,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             maxLines = 1,
                             modifier = Modifier.weight(1f).padding(end = 3.dp),
                         )
@@ -301,7 +301,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
             }
             Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                 Canvas(
-                    Modifier.width(widthDp).height((24 + 36 * layers.size).dp).background(StudioColors.Panel)
+                    Modifier.width(widthDp).height((28 + 42 * layers.size).dp).background(StudioColors.Panel)
                         .pointerInput(ppf) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
