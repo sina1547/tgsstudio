@@ -153,14 +153,14 @@ fun TimelinePanel(state: EditorState) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 38.dp, iconSize = 20.dp)
                 NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(64.dp), decimals = 0, label = "F")
-                IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
+                IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 38.dp, iconSize = 20.dp)
                 val selectedLayer = target as? LayerTarget
                 IconBtn(Ic.Split, {
                     selectedLayer?.let { layer ->
                         val result = state.act { splitLayer(layer.layer, state.frame) }
                         if (result == null) state.message = splitHint
                     }
-                }, enabled = selectedLayer != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
+                }, enabled = selectedLayer != null, size = 38.dp, iconSize = 20.dp, tint = StudioColors.Accent)
                 val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
                 IconBtn(Ic.Add, {
                     val ri = activeRow
@@ -172,10 +172,10 @@ fun TimelinePanel(state: EditorState) {
                         if (ki >= 0) state.selectedKey = ri to ki
                         state.changed()
                     }
-                }, enabled = activeRow != null, size = 34.dp, iconSize = 17.dp, tint = StudioColors.Accent)
-                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 17.dp)
-                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 17.dp)
-                IconBtn(Ic.Fit, { state.timelinePxPerFrame = 6f; state.selectedKey = null }, size = 34.dp, iconSize = 17.dp)
+                }, enabled = activeRow != null, size = 38.dp, iconSize = 20.dp, tint = StudioColors.Accent)
+                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 38.dp, iconSize = 20.dp)
+                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 38.dp, iconSize = 20.dp)
+                IconBtn(Ic.Fit, { state.timelinePxPerFrame = 6f; state.selectedKey = null }, size = 38.dp, iconSize = 20.dp)
                 SmallButton(if (state.multiKeyframeMode) "Multi ✓" else "Multi", {
                     state.multiKeyframeMode = !state.multiKeyframeMode
                     if (!state.multiKeyframeMode) state.selectedKeys = state.selectedKey?.let { setOf(it) } ?: emptySet()
@@ -191,7 +191,7 @@ fun TimelinePanel(state: EditorState) {
                         state.selectedKey = null
                         state.changed()
                     }
-                }, enabled = state.selectedKeys.isNotEmpty(), size = 34.dp, iconSize = 17.dp, tint = StudioColors.Danger)
+                }, enabled = state.selectedKeys.isNotEmpty(), size = 38.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
@@ -267,7 +267,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
         }
         Row(Modifier.fillMaxWidth().heightIn(max = 168.dp).verticalScroll(rememberScrollState())) {
             Column(Modifier.width(LABEL_W).background(StudioColors.PanelRaised)) {
-                Box(Modifier.height(24.dp))
+                Box(Modifier.height(28.dp))
                 layers.forEachIndexed { index, layer ->
                     val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
                     Row(
