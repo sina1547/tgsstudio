@@ -191,10 +191,9 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
-        // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
-        // This prevents the composition from jumping or being re-fitted when panels are opened.
-        // The lower workspace has a fixed responsive height; it is not draggable.
-        val workspacePanelHeight = (maxHeight * 0.44f).coerceIn(260.dp, 400.dp)
+        // Alight Motion-inspired workspace: a single preview surface above a continuous timeline dock.
+        // The dock gets a stable, larger share of the portrait viewport so layer clips remain usable.
+        val workspacePanelHeight = (maxHeight * 0.48f).coerceIn(300.dp, 440.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -204,17 +203,13 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     Text(m, color = Color.White, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelHigh).padding(horizontal = 14.dp, vertical = 8.dp))
                 }
                 if (state.previewMode) IconBtn(Ic.Close, { state.previewMode = false; state.playing = false }, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99000000), RoundedCornerShape(12.dp)), tint = Color.White)
-
             }
 
             if (!state.previewMode) {
-                // Playback controls stay directly beneath the canvas; tool actions live in the right dock.
+                // One compact transport strip; timeline editing actions are kept in the timeline dock.
                 Ltr { PlaybackBar(state) }
-                Column(
-                    Modifier.fillMaxWidth().height(workspacePanelHeight)
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                        .background(StudioColors.Panel)
-                ) {
+                Column(Modifier.fillMaxWidth().height(workspacePanelHeight).background(StudioColors.Panel)) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         TimelinePanel(state)
                     }
