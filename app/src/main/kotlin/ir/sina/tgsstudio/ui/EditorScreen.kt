@@ -274,7 +274,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
         // Dock is anchored to the canvas edge; contextual controls stay inside this fixed overlay.
         Column(
             Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
-                .width(if (toolsOpen) 168.dp else 54.dp)
+                .width(if (toolsOpen) 168.dp else 64.dp)
                 .clip(if (toolsOpen) RoundedCornerShape(14.dp) else CircleShape)
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
