@@ -221,14 +221,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 ) {
                     PanelHandle(state, maxWorkspaceHeight.value)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        when (state.panel ?: PanelTab.TIMELINE) {
-                            PanelTab.LAYERS -> LayersPanel(state)
-                            PanelTab.PROPERTIES -> PropertiesPanel(state)
-                            PanelTab.TIMELINE -> TimelinePanel(state)
-                            PanelTab.EFFECTS -> EffectsPanel(state)
-                        }
+                        TimelinePanel(state)
                     }
-                    PanelTabBar(state)
                 }
             }
         }
