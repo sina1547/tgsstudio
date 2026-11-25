@@ -551,9 +551,12 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(tr("Sides: ${state.polygonSides}", "تعداد اضلاع: ${state.polygonSides}"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.polygonSides.toFloat(), 3f..20f, {}, { state.polygonSides = it.toInt().coerceIn(3, 20) }, {})
                 }
-                Tool.ROUNDED_RECT -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text(tr("Corner radius: ${fmt(state.rectRoundness.toDouble(), 0)} px", "شعاع گوشه: ${fmt(state.rectRoundness.toDouble(), 0)} پیکسل"), color = StudioColors.TextMuted, fontSize = 11.sp)
-                    GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {})
+                Tool.ROUNDED_RECT -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Corner radius", "شعاع گوشه‌ها"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
+                        GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
+                    }
                 }
                 Tool.ARC -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Text(tr("Arc angle: ${state.arcDegrees}°", "زاویه کمان: ${state.arcDegrees}°"), color = StudioColors.TextMuted, fontSize = 11.sp)
