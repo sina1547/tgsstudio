@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -112,6 +113,7 @@ fun EffectsPanel(state: EditorState) {
     val fps = state.session.doc.frameRate
     var params by remember { mutableStateOf(kind.defaults(fps, state.frame)) }
     var naming by remember { mutableStateOf(false) }
+    var showEffectSettings by rememberSaveable { mutableStateOf(false) }
     val tick = state.tick
     val selection = remember(tick) { state.session.selection }
 
@@ -123,42 +125,75 @@ fun EffectsPanel(state: EditorState) {
             Text(tr("Effects", "افکت‌ها"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp).weight(1f))
             Text(if (selection.isEmpty()) tr("Select a layer", "یک لایه انتخاب کنید") else tr("${selection.map { it.layer }.distinct().size} layer(s)", "${selection.map { it.layer }.distinct().size} لایه"), color = if (selection.isEmpty()) StudioColors.Warning else StudioColors.TextMuted, fontSize = 12.sp)
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            EffectKind.entries.forEach { k -> Chip(kindLabel(k), k == kind, k.supported) { discardPreview(state); kindId = k.id; params = k.defaults(fps, state.frame) } }
-        }
-        if (!kind.supported) {
-            Text(tr("Blur is a layer effect, and Telegram's TGS format forbids layer effects, so it can't be added. Glow gives a similar soft halo.", "بلور یک افکت لایه است و فرمت TGS تلگرام افکت لایه را ممنوع کرده؛ پس قابل افزودن نیست. «درخشش» حالت هالهٔ نرم مشابهی می‌دهد."), color = StudioColors.Warning, fontSize = 13.sp)
+        if (!showEffectSettings) {
+            Text(tr("Choose an effect", "انتخاب افکت"), color = StudioColors.TextMuted, fontSize = 12.sp)
+            EffectKind.entries.chunked(2).forEach { rowKinds ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowKinds.forEach { k ->
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                                .background(if (k == kind) StudioColors.AccentSoft else StudioColors.PanelRaised)
+                                .clickable {
+                                    discardPreview(state)
+                                    kindId = k.id
+                                    params = k.defaults(fps, state.frame)
+                                    showEffectSettings = true
+                                }
+                                .padding(horizontal = 10.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(Ic.Effects, if (k == kind) StudioColors.Accent else StudioColors.TextMuted, 22.dp)
+                            Text(
+                                kindLabel(k),
+                                color = if (k == kind) StudioColors.Accent else if (k.supported) StudioColors.TextPrimary else StudioColors.TextMuted,
+                                fontSize = 11.sp, maxLines = 2,
+                            )
+                        }
+                    }
+                    if (rowKinds.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) { Labeled(tr("Start frame", "فریم شروع")) { NumberField(params.startFrame, { params = params.copy(startFrame = it.coerceAtLeast(0.0)) }, decimals = 0) } }
-                Column(Modifier.weight(1f)) { Labeled(tr("Duration (frames)", "مدت (فریم)")) { NumberField(params.durationFrames, { params = params.copy(durationFrames = it.coerceAtLeast(2.0)) }, decimals = 0) } }
-                SmallButton(tr("Playhead", "پخش‌کننده"), { params = params.copy(startFrame = Math.rint(state.frame)) }, modifier = Modifier.padding(top = 18.dp))
+                IconBtn(Ic.Back, { discardPreview(state); showEffectSettings = false }, size = 38.dp, iconSize = 20.dp)
+                Text(kindLabel(kind), color = StudioColors.TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                SmallButton(tr("All effects", "همه افکت‌ها"), { discardPreview(state); showEffectSettings = false })
             }
-            Text("${tr("One cycle", "یک دور")} = ${fmt(params.durationFrames / fps, 2)} ${tr("s", "ثانیه")}", color = StudioColors.TextMuted, fontSize = 12.sp)
-            Labeled("${tr("Strength", "شدت")}  ${fmt(params.strength, 0)}%") {
-                GestureSlider(params.strength.toFloat(), 10f..300f, {}, { params = params.copy(strength = it.toDouble()) }, {})
-            }
-            if (kind.periodic) Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(tr("Repeat until the end", "تکرار تا پایان"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
-                Switch(params.loop, { params = params.copy(loop = it) }, colors = SwitchDefaults.colors(checkedTrackColor = StudioColors.Accent))
-            }
-            if (kind.directional) {
-                val labels = if (kind == EffectKind.ROTATE) listOf(tr("Anticlockwise", "پادساعتگرد"), tr("Clockwise", "ساعتگرد")) else listOf(tr("From left", "از چپ"), tr("From right", "از راست"), tr("From top", "از بالا"), tr("From bottom", "از پایین"))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { labels.forEachIndexed { i, l -> Chip(l, params.direction == i) { params = params.copy(direction = i) } } }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.fxPreviewing) {
-                    SmallButton(tr("Keep", "نگه‌دار"), { keepPreview(state) }, primary = true, ic = Ic.Check)
-                    SmallButton(tr("Discard", "دور بینداز"), { discardPreview(state) })
-                    SmallButton(tr("Replay", "پخش دوباره"), { startPreview(state, kind, params) })
-                } else {
-                    SmallButton(tr("Preview", "پیش‌نمایش"), { startPreview(state, kind, params) }, ic = Ic.Play, enabled = selection.isNotEmpty())
-                    SmallButton(tr("Apply", "اعمال"), {
-                        val r = state.act { applyEffect(kind, params) }
-                        state.message = noteText(state, r) ?: (if (state.isFa) "افکت اعمال شد" else "Effect applied")
-                        if (r.applied > 0) { state.seek(params.startFrame); state.playing = true }
-                    }, primary = true, enabled = selection.isNotEmpty())
-                    SmallButton(tr("Save preset", "ذخیره به‌عنوان پیش‌تنظیم"), { naming = true })
+            if (!kind.supported) {
+                Text(tr("Blur is a layer effect, and Telegram's TGS format forbids layer effects, so it can't be added. Glow gives a similar soft halo.", "بلور یک افکت لایه است و فرمت TGS تلگرام افکت لایه را ممنوع کرده؛ پس قابل افزودن نیست. «درخشش» حالت هالهٔ نرم مشابهی می‌دهد."), color = StudioColors.Warning, fontSize = 13.sp)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) { Labeled(tr("Start frame", "فریم شروع")) { NumberField(params.startFrame, { params = params.copy(startFrame = it.coerceAtLeast(0.0)) }, decimals = 0) } }
+                    Column(Modifier.weight(1f)) { Labeled(tr("Duration (frames)", "مدت (فریم)")) { NumberField(params.durationFrames, { params = params.copy(durationFrames = it.coerceAtLeast(2.0)) }, decimals = 0) } }
+                    SmallButton(tr("Playhead", "پخش‌کننده"), { params = params.copy(startFrame = Math.rint(state.frame)) }, modifier = Modifier.padding(top = 18.dp))
+                }
+                Text("${tr("One cycle", "یک دور")} = ${fmt(params.durationFrames / fps, 2)} ${tr("s", "ثانیه")}", color = StudioColors.TextMuted, fontSize = 12.sp)
+                Labeled("${tr("Strength", "شدت")}  ${fmt(params.strength, 0)}%") {
+                    GestureSlider(params.strength.toFloat(), 10f..300f, {}, { params = params.copy(strength = it.toDouble()) }, {})
+                }
+                if (kind.periodic) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(tr("Repeat until the end", "تکرار تا پایان"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
+                    Switch(params.loop, { params = params.copy(loop = it) }, colors = SwitchDefaults.colors(checkedTrackColor = StudioColors.Accent))
+                }
+                if (kind.directional) {
+                    val labels = if (kind == EffectKind.ROTATE) listOf(tr("Anticlockwise", "پادساعتگرد"), tr("Clockwise", "ساعتگرد")) else listOf(tr("From left", "از چپ"), tr("From right", "از راست"), tr("From top", "از بالا"), tr("From bottom", "از پایین"))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { labels.forEachIndexed { i, l -> Chip(l, params.direction == i) { params = params.copy(direction = i) } } }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.fxPreviewing) {
+                        SmallButton(tr("Keep", "نگه‌دار"), { keepPreview(state) }, primary = true, ic = Ic.Check)
+                        SmallButton(tr("Discard", "دور بینداز"), { discardPreview(state) })
+                        SmallButton(tr("Replay", "پخش دوباره"), { startPreview(state, kind, params) })
+                    } else {
+                        SmallButton(tr("Preview", "پیش‌نمایش"), { startPreview(state, kind, params) }, ic = Ic.Play, enabled = selection.isNotEmpty())
+                        SmallButton(tr("Apply", "اعمال"), {
+                            val r = state.act { applyEffect(kind, params) }
+                            state.message = noteText(state, r) ?: (if (state.isFa) "افکت اعمال شد" else "Effect applied")
+                            if (r.applied > 0) { state.seek(params.startFrame); state.playing = true }
+                        }, primary = true, enabled = selection.isNotEmpty())
+                        SmallButton(tr("Save preset", "ذخیره به‌عنوان پیش‌تنظیم"), { naming = true })
+                    }
                 }
             }
             if (state.fxPreviewing) Text(tr("Previewing: Keep it, or Discard to undo. Closing this panel discards it.", "در حال پیش‌نمایش: نگه دارید یا دور بیندازید. بستن پنل آن را دور می‌اندازد."), color = StudioColors.TextMuted, fontSize = 12.sp)
