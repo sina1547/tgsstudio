@@ -449,9 +449,9 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
         }
         Box(Modifier.width(1.dp).height(28.dp).background(StudioColors.Divider))
         IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 40.dp, iconSize = 21.dp)
-        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Export, onExport, size = 38.dp, iconSize = 19.dp, tint = StudioColors.Accent)
+        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 40.dp, iconSize = 21.dp)
+        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 40.dp, iconSize = 21.dp)
+        IconBtn(Ic.Export, onExport, size = 40.dp, iconSize = 21.dp, tint = StudioColors.Accent)
         Box {
             IconBtn(Ic.More, onMore, size = 38.dp)
             DropdownMenu(menuOpen, onMenuClose, containerColor = StudioColors.PanelRaised) {
@@ -694,8 +694,8 @@ private fun PlaybackBar(state: EditorState) {
     ) {
         IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 36.dp, iconSize = 19.dp)
         IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 38.dp, iconSize = 20.dp)
-        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 30.dp, iconSize = 15.dp)
-        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 30.dp, iconSize = 15.dp)
+        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 36.dp, iconSize = 19.dp)
+        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 36.dp, iconSize = 19.dp)
         Slider(
             value = state.frame.toFloat().coerceIn(lo, hi), onValueChange = { state.playing = false; state.seek(Math.rint(it.toDouble())) }, valueRange = lo..hi,
             colors = SliderDefaults.colors(thumbColor = StudioColors.Accent, activeTrackColor = StudioColors.Accent, inactiveTrackColor = StudioColors.PanelHigh),
