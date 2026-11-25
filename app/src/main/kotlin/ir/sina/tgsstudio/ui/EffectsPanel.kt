@@ -56,6 +56,21 @@ fun kindLabel(k: EffectKind): String = when (k) {
     EffectKind.BLUR -> tr("Blur", "محو‌کردن (بلور)")
 }
 
+
+private data class EffectCategoryUi(val id: String, val en: String, val fa: String, val kinds: List<EffectKind>)
+
+private fun effectCategories() = listOf(
+    EffectCategoryUi("draw", "Drawing & Edge", "طراحی و لبه", listOf(EffectKind.DRAW_ON, EffectKind.DRAW_OFF)),
+    EffectCategoryUi("color", "Color & Light", "رنگ و نور", listOf(EffectKind.GLOW)),
+    EffectCategoryUi("warp", "Distortion / Warp", "اعوجاج و تغییر شکل", listOf(EffectKind.SHAKE, EffectKind.BOUNCE)),
+    EffectCategoryUi("blur", "Blur", "محو و بلور", listOf(EffectKind.BLUR)),
+    EffectCategoryUi("move", "Move / Transform", "حرکت و تبدیل", listOf(EffectKind.ZOOM_IN, EffectKind.ZOOM_OUT, EffectKind.SCALE, EffectKind.ROTATE, EffectKind.SLIDE_IN, EffectKind.SLIDE_OUT)),
+    EffectCategoryUi("opacity", "Opacity / Visibility", "شفافیت و نمایش", listOf(EffectKind.FADE_IN, EffectKind.FADE_OUT, EffectKind.OPACITY)),
+    EffectCategoryUi("repeat", "Procedural / Repeat", "رویه‌ای و تکرار", listOf(EffectKind.PULSE, EffectKind.FLOAT)),
+)
+
+private fun effectCategoryLabel(c: EffectCategoryUi) = tr(c.en, c.fa)
+
 private fun noteText(state: EditorState, r: EffectResult): String? {
     val fa = state.isFa
     val parts = r.notes.mapNotNull { n ->
@@ -114,8 +129,28 @@ fun EffectsPanel(state: EditorState) {
     var params by remember { mutableStateOf(kind.defaults(fps, state.frame)) }
     var naming by remember { mutableStateOf(false) }
     var showEffectSettings by rememberSaveable { mutableStateOf(false) }
+    var browseMode by rememberSaveable { mutableStateOf("categories") }
+    var categoryId by rememberSaveable { mutableStateOf("draw") }
+    val catalogPrefs = remember { context.getSharedPreferences("effect_catalog", 0) }
+    var favorites by remember { mutableStateOf(catalogPrefs.getStringSet("favorites", emptySet())?.toSet() ?: emptySet()) }
+    var recent by remember { mutableStateOf(catalogPrefs.getString("recent", "").orEmpty().split("|").filter { it.isNotBlank() }) }
     val tick = state.tick
     val selection = remember(tick) { state.session.selection }
+
+    fun rememberRecent(effect: EffectKind) {
+        recent = (listOf(effect.id) + recent.filterNot { it == effect.id }).take(8)
+        catalogPrefs.edit().putString("recent", recent.joinToString("|")).apply()
+    }
+    fun toggleFavorite(effect: EffectKind) {
+        favorites = if (effect.id in favorites) favorites - effect.id else favorites + effect.id
+        catalogPrefs.edit().putStringSet("favorites", favorites.toSet()).apply()
+    }
+    fun chooseEffect(effect: EffectKind) {
+        discardPreview(state)
+        kindId = effect.id
+        params = effect.defaults(fps, state.frame)
+        showEffectSettings = true
+    }
 
     DisposableEffect(Unit) { onDispose { if (state.fxPreviewing) discardPreview(state) } }   // closing the panel drops an unkept preview
 
@@ -126,32 +161,81 @@ fun EffectsPanel(state: EditorState) {
             Text(if (selection.isEmpty()) tr("Select a layer", "یک لایه انتخاب کنید") else tr("${selection.map { it.layer }.distinct().size} layer(s)", "${selection.map { it.layer }.distinct().size} لایه"), color = if (selection.isEmpty()) StudioColors.Warning else StudioColors.TextMuted, fontSize = 12.sp)
         }
         if (!showEffectSettings) {
-            Text(tr("Choose an effect", "انتخاب افکت"), color = StudioColors.TextMuted, fontSize = 12.sp)
-            EffectKind.entries.chunked(2).forEach { rowKinds ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowKinds.forEach { k ->
-                        Column(
-                            Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
-                                .background(if (k == kind) StudioColors.AccentSoft else StudioColors.PanelRaised)
-                                .clickable {
-                                    discardPreview(state)
-                                    kindId = k.id
-                                    params = k.defaults(fps, state.frame)
-                                    showEffectSettings = true
+            Text(tr("Browse effects", "مرور افکت‌ها"), color = StudioColors.TextMuted, fontSize = 12.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(tr("Categories", "دسته‌بندی‌ها"), browseMode == "categories") { browseMode = "categories" }
+                Chip(tr("Often used", "پراستفاده"), browseMode == "popular") { browseMode = "popular" }
+                Chip(tr("Favorites", "علاقه‌مندی‌ها"), browseMode == "favorites") { browseMode = "favorites" }
+                Chip(tr("Last added", "اخیر"), browseMode == "recent") { browseMode = "recent" }
+            }
+            if (browseMode == "categories") {
+                effectCategories().chunked(2).forEach { rowCategories ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowCategories.forEach { category ->
+                            Column(
+                                Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                                    .background(if (category.id == categoryId) StudioColors.AccentSoft else StudioColors.PanelRaised)
+                                    .clickable { categoryId = category.id; browseMode = "category" }
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                Icon(Ic.Effects, StudioColors.Accent, 22.dp)
+                                Text(effectCategoryLabel(category), color = StudioColors.TextPrimary, fontSize = 12.sp, maxLines = 2)
+                                Text("${category.kinds.size} ${tr("effects", "افکت")}", color = StudioColors.TextMuted, fontSize = 10.sp)
+                            }
+                        }
+                        if (rowCategories.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            } else {
+                if (browseMode == "category") {
+                    val category = effectCategories().firstOrNull { it.id == categoryId }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBtn(Ic.Back, { browseMode = "categories" }, size = 36.dp, iconSize = 18.dp)
+                        Text(category?.let(::effectCategoryLabel) ?: tr("Effects", "افکت‌ها"), color = StudioColors.TextPrimary, fontSize = 14.sp)
+                    }
+                }
+                val visibleKinds = when (browseMode) {
+                    "popular" -> listOf(EffectKind.FADE_IN, EffectKind.GLOW, EffectKind.SHAKE, EffectKind.SCALE, EffectKind.DRAW_ON, EffectKind.PULSE)
+                    "favorites" -> EffectKind.entries.filter { it.id in favorites }
+                    "recent" -> recent.mapNotNull(EffectKind::byId)
+                    else -> effectCategories().firstOrNull { it.id == categoryId }?.kinds.orEmpty()
+                }
+                if (visibleKinds.isEmpty()) {
+                    Text(
+                        if (browseMode == "favorites") tr("No favorites yet. Tap ☆ on an effect to save it here.", "هنوز افکتی ذخیره نشده؛ با ☆ کنار افکت آن را اضافه کنید.")
+                        else if (browseMode == "recent") tr("Effects you open will appear here.", "افکت‌هایی که باز می‌کنید اینجا نمایش داده می‌شوند.")
+                        else tr("No effects in this category yet.", "هنوز افکتی در این دسته وجود ندارد."),
+                        color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 18.dp),
+                    )
+                } else {
+                    visibleKinds.distinct().chunked(2).forEach { rowKinds ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowKinds.forEach { effect ->
+                                Column(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                                        .background(if (effect == kind) StudioColors.AccentSoft else StudioColors.PanelRaised)
+                                        .clickable { chooseEffect(effect) }
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Ic.Effects, if (effect.supported) StudioColors.Accent else StudioColors.TextMuted, 21.dp)
+                                        Spacer(Modifier.weight(1f))
+                                        Text(
+                                            if (effect.id in favorites) "★" else "☆",
+                                            color = if (effect.id in favorites) StudioColors.Warning else StudioColors.TextMuted,
+                                            modifier = Modifier.clickable { toggleFavorite(effect) }.padding(horizontal = 5.dp),
+                                            fontSize = 18.sp,
+                                        )
+                                    }
+                                    Text(kindLabel(effect), color = if (effect.supported) StudioColors.TextPrimary else StudioColors.TextMuted, fontSize = 12.sp, maxLines = 2)
+                                    if (!effect.supported) Text(tr("Not supported by TGS", "در TGS پشتیبانی نمی‌شود"), color = StudioColors.Warning, fontSize = 9.sp)
                                 }
-                                .padding(horizontal = 10.dp, vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(Ic.Effects, if (k == kind) StudioColors.Accent else StudioColors.TextMuted, 22.dp)
-                            Text(
-                                kindLabel(k),
-                                color = if (k == kind) StudioColors.Accent else if (k.supported) StudioColors.TextPrimary else StudioColors.TextMuted,
-                                fontSize = 11.sp, maxLines = 2,
-                            )
+                            }
+                            if (rowKinds.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
-                    if (rowKinds.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         } else {
@@ -186,9 +270,10 @@ fun EffectsPanel(state: EditorState) {
                         SmallButton(tr("Discard", "دور بینداز"), { discardPreview(state) })
                         SmallButton(tr("Replay", "پخش دوباره"), { startPreview(state, kind, params) })
                     } else {
-                        SmallButton(tr("Preview", "پیش‌نمایش"), { startPreview(state, kind, params) }, ic = Ic.Play, enabled = selection.isNotEmpty())
+                        SmallButton(tr("Preview", "پیش‌نمایش"), { rememberRecent(kind); startPreview(state, kind, params) }, ic = Ic.Play, enabled = selection.isNotEmpty())
                         SmallButton(tr("Apply", "اعمال"), {
                             val r = state.act { applyEffect(kind, params) }
+                            if (r.applied > 0) rememberRecent(kind)
                             state.message = noteText(state, r) ?: (if (state.isFa) "افکت اعمال شد" else "Effect applied")
                             if (r.applied > 0) { state.seek(params.startFrame); state.playing = true }
                         }, primary = true, enabled = selection.isNotEmpty())
