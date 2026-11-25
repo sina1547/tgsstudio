@@ -1,6 +1,8 @@
 package ir.sina.tgsstudio.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
@@ -239,6 +241,7 @@ fun TimelinePanel(state: EditorState) {
 }
 
 /** Composition-level layer tracks. Selecting a clip focuses that layer's animatable property tracks below. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp, scroll: androidx.compose.foundation.ScrollState) {
     val layers = state.session.doc.layers
@@ -269,17 +272,33 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                 Box(Modifier.height(24.dp))
                 layers.forEachIndexed { index, layer ->
                     val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
-                    Text(
-                        layer.name.ifBlank { "Layer ${index + 1}" },
-                        color = if (selected) StudioColors.Accent else StudioColors.TextPrimary,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        modifier = Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 4.dp, vertical = 2.dp)
+                    Row(
+                        Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 3.dp, vertical = 2.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(if (selected) StudioColors.AccentSoft else StudioColors.PanelHigh.copy(alpha = 0.45f))
-                            .clickable { selectLayer(index) }
-                            .padding(start = 8.dp, top = 9.dp),
-                    )
+                            .combinedClickable(onClick = { selectLayer(index) }, onLongClick = { selectLayer(index) })
+                            .padding(horizontal = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconBtn(
+                            if (layer.hidden) Ic.EyeOff else Ic.Eye,
+                            { state.act { setHidden(LayerTarget(LayerRef(null, index)), !layer.hidden) } },
+                            size = 28.dp,
+                            iconSize = 15.dp,
+                            tint = if (layer.hidden) StudioColors.TextMuted else StudioColors.TextSecondary,
+                        )
+                        Box(
+                            Modifier.padding(start = 2.dp, end = 5.dp).width(4.dp).height(20.dp)
+                                .clip(RoundedCornerShape(3.dp)).background(layerTrackColor(index))
+                        )
+                        Text(
+                            layer.name.ifBlank { "Layer ${index + 1}" },
+                            color = if (selected) StudioColors.Accent else if (layer.hidden) StudioColors.TextMuted else StudioColors.TextPrimary,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f).padding(end = 3.dp),
+                        )
+                    }
                 }
             }
             Box(Modifier.weight(1f).horizontalScroll(scroll)) {
@@ -394,7 +413,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                         if (x1 > x0) {
                             val selected = state.session.selection.any { it.layer.scope == null && it.layer.index == index }
                             drawRoundRect(
-                                if (selected) StudioColors.Accent.copy(alpha = 0.72f) else StudioColors.PanelHigh,
+                                if (selected) layerTrackColor(index).copy(alpha = 0.95f) else layerTrackColor(index).copy(alpha = if (layer.hidden) 0.22f else 0.58f),
                                 Offset(x0, top + 6f * density),
                                 Size(x1 - x0, rowPx - 12f * density),
                                 androidx.compose.ui.geometry.CornerRadius(5f * density),
@@ -416,6 +435,11 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
         }
     }
 }
+
+private fun layerTrackColor(index: Int): Color = listOf(
+    Color(0xFF4F8CFF), Color(0xFF23BFA5), Color(0xFFFFA24A), Color(0xFFB47CFF),
+    Color(0xFFFF6F91), Color(0xFF62B6E7), Color(0xFFB4C84A), Color(0xFFE18BCE),
+).let { it[index.mod(it.size)] }
 
 @Composable
 private fun TimelineCanvas(state: EditorState, rows: List<PropEntry>, scope: String?, widthDp: androidx.compose.ui.unit.Dp) {
