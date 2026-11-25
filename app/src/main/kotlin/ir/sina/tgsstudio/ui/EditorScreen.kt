@@ -204,15 +204,11 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     Text(m, color = Color.White, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelHigh).padding(horizontal = 14.dp, vertical = 8.dp))
                 }
                 if (state.previewMode) IconBtn(Ic.Close, { state.previewMode = false; state.playing = false }, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99000000), RoundedCornerShape(12.dp)), tint = Color.White)
-                if (!state.previewMode) ContextBars(state, Modifier.align(Alignment.BottomCenter))
+
             }
 
             if (!state.previewMode) {
-                QuickActionBar(
-                    state = state,
-                    onText = { showText = true },
-                    onMedia = { svgPicker.launch(arrayOf("*/*")) },
-                )
+                // Playback controls stay directly beneath the canvas; tool actions live in the right dock.
                 Ltr { PlaybackBar(state) }
                 Column(
                     Modifier.fillMaxWidth().height(workspacePanelHeight)
@@ -275,8 +271,8 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     Box(Modifier.fillMaxSize()) {
         EditorCanvas(state)
         Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
-                .width(if (toolsOpen) 214.dp else 48.dp)
+            Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
+                .width(if (toolsOpen) 184.dp else 48.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
@@ -290,6 +286,13 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
                 Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
+                    ToolGroupLabel(tr("Create & import", "افزودن و ورود"))
+                    ToolDrawerAction(Ic.Text, tr("Add text", "افزودن متن"), onText)
+                    ToolDrawerAction(Ic.Svg, tr("Import media", "افزودن رسانه"), onSvg)
+                    ToolDrawerAction(Ic.Effects, tr("Effects", "افکت‌ها")) {
+                        state.updatePanel(PanelTab.EFFECTS)
+                    }
+                    Box(Modifier.fillMaxWidth().padding(vertical = 5.dp).height(1.dp).background(StudioColors.Divider))
                     ToolGroupHeader(tr("Selection & navigation", "انتخاب و جابه‌جایی"), "selection" in expandedToolGroups) { toggleToolGroup("selection") }
                     if ("selection" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { state.toolsDrawerOpen = false })
@@ -358,6 +361,9 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                         SmallButton(label, { state.setWorkspaceMode(w); state.toolsDrawerOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                     }
+                    Box(Modifier.fillMaxWidth().padding(vertical = 5.dp).height(1.dp).background(StudioColors.Divider))
+                    ToolGroupLabel(tr("Tool settings", "تنظیمات ابزار انتخاب‌شده"))
+                    ContextBars(state, Modifier.fillMaxWidth())
                 }
             } else {
                 IconBtn(Ic.Tools, { state.openToolsDrawer() }, active = true, size = 38.dp, iconSize = 21.dp)
