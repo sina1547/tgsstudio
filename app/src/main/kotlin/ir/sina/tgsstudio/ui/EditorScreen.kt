@@ -220,7 +220,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                         .background(StudioColors.Panel)
                 ) {
                     PanelHandle(state, maxWorkspaceHeight.value)
-                    PanelTabBar(state)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when (state.panel ?: PanelTab.TIMELINE) {
                             PanelTab.LAYERS -> LayersPanel(state)
@@ -229,6 +228,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                             PanelTab.EFFECTS -> EffectsPanel(state)
                         }
                     }
+                    PanelTabBar(state)
                 }
             }
         }
@@ -725,31 +725,38 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 
 @Composable
 private fun PanelTabBar(state: EditorState) {
-    val tabs = listOf(
-        Triple(PanelTab.LAYERS, Ic.Layers, tr("Layers", "لایه‌ها")),
-        Triple(PanelTab.PROPERTIES, Ic.Props, tr("Properties", "ویژگی‌ها")),
-        Triple(PanelTab.TIMELINE, Ic.Timeline, tr("Timeline", "تایم‌لاین")),
-        Triple(PanelTab.EFFECTS, Ic.Effects, tr("Effects", "افکت‌ها")),
+    data class DockItem(val tab: PanelTab?, val icon: Ic, val label: String)
+    val items = listOf(
+        DockItem(null, Ic.Tools, tr("Design", "طراحی")),
+        DockItem(PanelTab.TIMELINE, Ic.Timeline, tr("Animation", "انیمیشن")),
+        DockItem(PanelTab.EFFECTS, Ic.Effects, tr("Effects", "افکت‌ها")),
+        DockItem(PanelTab.LAYERS, Ic.Layers, tr("Layers", "لایه‌ها")),
+        DockItem(PanelTab.PROPERTIES, Ic.Props, tr("Properties", "ویژگی‌ها")),
     )
     Row(
-        Modifier.fillMaxWidth().height(40.dp).background(StudioColors.Panel)
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxWidth().height(54.dp).background(StudioColors.Panel)
+            .padding(horizontal = 5.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { (tab, icon, label) ->
-            val active = (state.panel ?: PanelTab.TIMELINE) == tab
-            Row(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(9.dp))
+        items.forEach { item ->
+            val active = if (item.tab == null) state.toolsDrawerOpen else !state.toolsDrawerOpen && (state.panel ?: PanelTab.TIMELINE) == item.tab
+            Column(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(10.dp))
                     .background(if (active) StudioColors.AccentSoft else Color.Transparent)
-                    .clickable { state.updatePanel(tab) }
-                    .padding(horizontal = 3.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                    .clickable {
+                        if (item.tab == null) state.openToolsDrawer()
+                        else {
+                            state.toolsDrawerOpen = false
+                            state.updatePanel(item.tab)
+                        }
+                    }.padding(vertical = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Icon(icon, if (active) StudioColors.Accent else StudioColors.TextMuted, 17.dp)
-                Text(label, color = if (active) StudioColors.Accent else StudioColors.TextMuted,
-                    fontSize = 10.sp, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+                Icon(item.icon, if (active) StudioColors.Accent else StudioColors.TextMuted, 18.dp)
+                Text(item.label, color = if (active) StudioColors.Accent else StudioColors.TextMuted,
+                    fontSize = 9.sp, maxLines = 1)
             }
         }
     }
