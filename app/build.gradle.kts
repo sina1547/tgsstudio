@@ -23,8 +23,8 @@ android {
         applicationId = "ir.sina.tgsstudio"
         minSdk = 24
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.20.0"
+        versionCode = 34
+        versionName = "0.21.0"
     }
 
     signingConfigs {
