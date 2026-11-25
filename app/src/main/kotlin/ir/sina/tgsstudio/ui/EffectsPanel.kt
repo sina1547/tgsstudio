@@ -198,7 +198,7 @@ fun EffectsPanel(state: EditorState) {
                 val visibleKinds = when (browseMode) {
                     "popular" -> listOf(EffectKind.FADE_IN, EffectKind.GLOW, EffectKind.SHAKE, EffectKind.SCALE, EffectKind.DRAW_ON, EffectKind.PULSE)
                     "favorites" -> EffectKind.entries.filter { it.id in favorites }
-                    "recent" -> recent.mapNotNull(EffectKind::byId)
+                    "recent" -> recent.mapNotNull { EffectKind.byId(it) }
                     else -> effectCategories().firstOrNull { it.id == categoryId }?.kinds.orEmpty()
                 }
                 if (visibleKinds.isEmpty()) {
