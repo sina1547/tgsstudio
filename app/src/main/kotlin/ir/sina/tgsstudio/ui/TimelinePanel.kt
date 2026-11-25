@@ -285,7 +285,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                             { state.act { setHidden(LayerTarget(LayerRef(null, index)), !layer.hidden) } },
                             size = 28.dp,
                             iconSize = 15.dp,
-                            tint = if (layer.hidden) StudioColors.TextMuted else StudioColors.TextSecondary,
+                            tint = if (layer.hidden) StudioColors.TextMuted else StudioColors.TextMuted,
                         )
                         Box(
                             Modifier.padding(start = 2.dp, end = 5.dp).width(4.dp).height(20.dp)
