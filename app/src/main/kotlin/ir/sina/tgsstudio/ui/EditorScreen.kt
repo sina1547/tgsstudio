@@ -193,8 +193,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
         // This prevents the composition from jumping or being re-fitted when panels are opened.
-        val maxWorkspaceHeight = (maxHeight * 0.62f).coerceAtLeast(240.dp)
-        val workspacePanelHeight = state.panelHeightDp.dp.coerceIn(240.dp, maxWorkspaceHeight)
+        // The lower workspace has a fixed responsive height; it is not draggable.
+        val workspacePanelHeight = (maxHeight * 0.40f).coerceIn(120.dp, 190.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -215,7 +215,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                         .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                         .background(StudioColors.Panel)
                 ) {
-                    PanelHandle(state, maxWorkspaceHeight.value)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         TimelinePanel(state)
                     }
@@ -689,27 +688,27 @@ private fun PlaybackBar(state: EditorState) {
     val doc = state.session.doc
     val lo = doc.inPoint.toFloat(); val hi = max(lo + 1f, (doc.outPoint - 1).toFloat())
     Row(
-        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        Modifier.fillMaxWidth().height(36.dp).background(StudioColors.Panel).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 38.dp, iconSize = 19.dp)
-        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 40.dp, iconSize = 19.dp)
-        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 38.dp, iconSize = 18.dp)
+        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 30.dp, iconSize = 15.dp)
+        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 32.dp, iconSize = 16.dp)
+        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 30.dp, iconSize = 15.dp)
+        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 30.dp, iconSize = 15.dp)
         Slider(
             value = state.frame.toFloat().coerceIn(lo, hi), onValueChange = { state.playing = false; state.seek(Math.rint(it.toDouble())) }, valueRange = lo..hi,
             colors = SliderDefaults.colors(thumbColor = StudioColors.Accent, activeTrackColor = StudioColors.Accent, inactiveTrackColor = StudioColors.PanelHigh),
             modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
         )
         Column(
-            Modifier.clip(RoundedCornerShape(9.dp)).background(StudioColors.PanelHigh).padding(horizontal = 8.dp, vertical = 5.dp),
+            Modifier.clip(RoundedCornerShape(8.dp)).background(StudioColors.PanelHigh).padding(horizontal = 6.dp, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 12.sp)
-            Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 9.sp)
+            Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 10.sp)
+            Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 8.sp)
         }
-        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 3.dp))
+        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 2.dp))
     }
 }
 
