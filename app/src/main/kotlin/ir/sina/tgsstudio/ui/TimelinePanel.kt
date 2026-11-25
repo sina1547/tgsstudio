@@ -151,8 +151,6 @@ fun TimelinePanel(state: EditorState) {
             val sk = state.selectedKey
             val selEntry = sk?.let { rows.getOrNull(it.first) }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Ic.Timeline, StudioColors.Accent, 20.dp)
-                Text(tr("Timeline", "تایم‌لاین"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
                 IconBtn(Ic.Prev, { state.playing = false; state.seek(state.frame - 1.0) }, size = 34.dp, iconSize = 17.dp)
                 NumberField(state.frame, { state.playing = false; state.seek(Math.rint(it)) }, modifier = Modifier.width(76.dp), decimals = 0, label = "F")
                 IconBtn(Ic.Next, { state.playing = false; state.seek(state.frame + 1.0) }, size = 34.dp, iconSize = 17.dp)
