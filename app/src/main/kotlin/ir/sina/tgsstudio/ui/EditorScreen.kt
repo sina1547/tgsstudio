@@ -270,6 +270,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     }
     Box(Modifier.fillMaxSize()) {
         EditorCanvas(state)
+        // Dock is anchored to the canvas edge; contextual controls stay inside this fixed overlay.
         Column(
             Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
                 .width(if (toolsOpen) 184.dp else 48.dp)
