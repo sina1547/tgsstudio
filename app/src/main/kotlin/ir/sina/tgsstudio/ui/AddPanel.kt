@@ -82,11 +82,6 @@ fun AddPanel(state: EditorState, onPickSvg: () -> Unit, onText: () -> Unit) {
                 state.act { edit("Add null") { val l = Creator.nullLayer(doc, doc.root.arr("layers"), "Null"); Creator.insertLayer(doc, null, l) } }
             }, Modifier.weight(1f))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            AddTile(Ic.Draw, tr("Draw", "نقاشی"), { state.tool = Tool.DRAW; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
-            AddTile(Ic.Eraser, tr("Eraser", "پاک‌کن"), { state.tool = Tool.ERASE; state.updatePanel(null); state.changed() }, Modifier.weight(1f))
-            AddTile(Ic.Effects, tr("Effects", "افکت‌ها"), { state.updatePanel(PanelTab.EFFECTS) }, Modifier.weight(1f))
-        }
     }
 }
 
