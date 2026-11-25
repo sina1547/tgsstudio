@@ -30,6 +30,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -71,6 +79,41 @@ fun TimelinePanel(state: EditorState) {
     val totalFrames = (doc.outPoint - doc.inPoint).coerceAtLeast(1.0)
     val contentWidthDp = (totalFrames * ppf / density).toFloat().dp + 40.dp
     val hScroll = rememberScrollState()
+    val timelineFocusRequester = remember { FocusRequester() }
+    var timelineOwnsFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(timelineFocusRequester) { timelineFocusRequester.requestFocus() }
+
+    fun copySelectedKeyframe(): Boolean {
+        val selected = state.selectedKey ?: return false
+        val entry = rows.getOrNull(selected.first) ?: return false
+        val copied = KeyframeOps.copy(entry.prop, selected.second) ?: return false
+        state.copiedKeyframe = copied
+        state.message = if (state.isFa) "کیفریم کپی شد" else "Keyframe copied"
+        state.changed()
+        return true
+    }
+
+    fun pasteCopiedKeyframe(): Boolean {
+        val copied = state.copiedKeyframe ?: return false
+        val rowIndex = state.selectedKey?.first?.takeIf { it in rows.indices }
+            ?: state.selectedKeys.firstOrNull()?.first?.takeIf { it in rows.indices }
+            ?: rows.indices.firstOrNull()
+            ?: return false
+        val entry = rows[rowIndex]
+        val localFrame = Spaces.localFrame(state.session.index, scope, state.frame)
+        val pasted = state.act {
+            edit("Paste keyframe") { KeyframeOps.paste(entry.prop, copied, localFrame) }
+        }
+        if (!pasted) return false
+        val pastedIndex = KeyframeOps.times(entry.prop).indexOfFirst { abs(it - localFrame) < 0.5 }
+        if (pastedIndex >= 0) {
+            state.selectedKey = rowIndex to pastedIndex
+            state.selectedKeys = setOf(rowIndex to pastedIndex)
+        }
+        state.message = if (state.isFa) "کیفریم در فریم فعلی جای‌گذاری شد" else "Keyframe pasted at the current frame"
+        state.changed()
+        return true
+    }
     LaunchedEffect(state.frame, ppf) {
         val playheadPx = ((state.frame - doc.inPoint) * ppf).toInt().coerceAtLeast(0)
         val viewport = hScroll.viewportSize
@@ -83,7 +126,23 @@ fun TimelinePanel(state: EditorState) {
     }
 
     Ltr {
-        Column(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth()
+                .focusRequester(timelineFocusRequester)
+                .onFocusChanged { timelineOwnsFocus = it.isFocused }
+                .onPreviewKeyEvent { event ->
+                    if (!timelineOwnsFocus || event.type != KeyEventType.KeyDown || !event.isCtrlPressed) {
+                        false
+                    } else {
+                        when (event.key) {
+                            Key.C -> copySelectedKeyframe()
+                            Key.V -> pasteCopiedKeyframe()
+                            else -> false
+                        }
+                    }
+                }
+                .focusable()
+        ) {
             // toolbar for the selected keyframe
             val sk = state.selectedKey
             val selEntry = sk?.let { rows.getOrNull(it.first) }
