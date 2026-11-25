@@ -75,7 +75,6 @@ fun PropertiesPanel(state: EditorState) {
         key(tick) { PathSection(state, target) }
         key(tick) { AnimationSection(state, target) }
         key(tick) { EffectsSection(state, target) }
-        key(tick) { AdvancedSection(state, target) }
     }
 }
 
@@ -398,23 +397,6 @@ private fun AnimationSection(state: EditorState, t: Target) {
                     }
                 }, size = 38.dp, iconSize = 18.dp, active = hasHere)
             }
-        }
-    }
-}
-
-@Composable
-private fun AdvancedSection(state: EditorState, t: Target) {
-    val doc = state.session.doc
-    Section(tr("Advanced", "پیشرفته"), defaultOpen = false) {
-        Text(tr("Canvas ${doc.width}×${doc.height} · ${fmt(doc.frameRate, 0)} fps · ${fmt(doc.durationSeconds, 2)} s", "بوم ${doc.width}×${doc.height} · ${fmt(doc.frameRate, 0)} فریم/ثانیه · ${fmt(doc.durationSeconds, 2)} ثانیه"), color = StudioColors.TextMuted, fontSize = 13.sp)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("30 fps", { state.act { setFrameRate(30.0) } }, primary = doc.frameRate == 30.0)
-            SmallButton("60 fps", { state.act { setFrameRate(60.0) } }, primary = doc.frameRate == 60.0)
-        }
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("Hidden", "پنهان"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
-            val hidden = (t as? LayerTarget)?.let { state.session.index.layer(it.layer)?.hidden } ?: (t as? ShapeTarget)?.let { state.session.index.shape(it.ref)?.hidden } ?: false
-            Switch(hidden, { state.act { setHidden(t, it) } }, colors = SwitchDefaults.colors(checkedTrackColor = StudioColors.Accent))
         }
     }
 }
