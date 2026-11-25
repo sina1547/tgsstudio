@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -210,8 +211,14 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                 Ltr { PlaybackBar(state) }
                 Column(Modifier.fillMaxWidth().height(workspacePanelHeight).background(StudioColors.Panel)) {
                     Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
+                    PanelTabBar(state)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        TimelinePanel(state)
+                        when (state.panel ?: PanelTab.TIMELINE) {
+                            PanelTab.TIMELINE -> TimelinePanel(state)
+                            PanelTab.EFFECTS -> EffectsPanel(state)
+                            PanelTab.LAYERS -> LayersPanel(state)
+                            PanelTab.PROPERTIES -> PropertiesPanel(state)
+                        }
                     }
                 }
             }
@@ -266,9 +273,9 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
         EditorCanvas(state)
         // Dock is anchored to the canvas edge; contextual controls stay inside this fixed overlay.
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 6.dp)
-                .width(if (toolsOpen) 168.dp else 44.dp)
-                .clip(RoundedCornerShape(12.dp))
+            Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
+                .width(if (toolsOpen) 168.dp else 54.dp)
+                .clip(if (toolsOpen) RoundedCornerShape(14.dp) else CircleShape)
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -284,9 +291,6 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupLabel(tr("Create & import", "افزودن و ورود"))
                     ToolDrawerAction(Ic.Text, tr("Add text", "افزودن متن"), onText)
                     ToolDrawerAction(Ic.Svg, tr("Import media", "افزودن رسانه"), onSvg)
-                    ToolDrawerAction(Ic.Effects, tr("Effects", "افکت‌ها")) {
-                        state.updatePanel(PanelTab.EFFECTS)
-                    }
                     Box(Modifier.fillMaxWidth().padding(vertical = 5.dp).height(1.dp).background(StudioColors.Divider))
                     ToolGroupHeader(tr("Selection & navigation", "انتخاب و جابه‌جایی"), "selection" in expandedToolGroups) { toggleToolGroup("selection") }
                     if ("selection" in expandedToolGroups) {
@@ -320,22 +324,6 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     }
                     SmallButton(tr(if (showUtilities) "Hide workspace options" else "Workspace & canvas options", if (showUtilities) "بستن امکانات محیط" else "تنظیمات محیط و بوم"), { showUtilities = !showUtilities }, primary = showUtilities, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp))
                     if (showUtilities) {
-                    ToolGroupLabel(tr("Quick add", "افزودن سریع"))
-                    ToolDrawerAction(Ic.Rect, tr("Add rectangle", "افزودن مستطیل")) { addObject { addRect(centerX, centerY, 220.0, 160.0) } }
-                    ToolDrawerAction(Ic.Ellipse, tr("Add ellipse", "افزودن بیضی")) { addObject { addEllipse(centerX, centerY, 200.0, 200.0) } }
-                    ToolDrawerAction(Ic.Star, tr("Add star", "افزودن ستاره")) { addObject { addStar(centerX, centerY, 110.0) } }
-                    ToolDrawerAction(Ic.Polygon, tr("Add polygon", "افزودن چندضلعی")) { addObject { addPolygon(centerX, centerY, 110.0) } }
-                    ToolGroupLabel(tr("Objects & groups", "آبجکت‌ها و گروه‌ها"))
-                    ToolDrawerAction(Ic.NullLayer, tr("Null layer", "لایهٔ Null"), ::addNull)
-                    ToolDrawerAction(Ic.Link, tr("Linked Null", "Null متصل"), ::addLinkedNull)
-                    ToolDrawerAction(Ic.Group, tr("Empty Group", "گروه خالی")) { addObject { addEmptyGroup(centerX, centerY) } }
-                    ToolGroupLabel(tr("Create & import", "ساخت و ورود"))
-                    ToolDrawerAction(Ic.Text, tr("Text", "متن"), onText)
-                    ToolDrawerAction(Ic.Svg, tr("Import SVG", "ورود SVG"), onSvg)
-                    ToolDrawerAction(Ic.Effects, tr("Effects", "افکت‌ها")) {
-                        state.updatePanel(PanelTab.EFFECTS)
-                        state.toolsDrawerOpen = false
-                    }
                     ToolDrawerAction(Ic.Fit, tr("Fit canvas", "برازش بوم")) { state.fit(state.fitSize.x, state.fitSize.y) }
                     ToolGroupLabel(tr("Canvas guides", "راهنماهای بوم"))
                     SmallButton(tr(if (state.showGrid) "Grid ✓" else "Grid", if (state.showGrid) "شبکه ✓" else "شبکه"), { state.persistShowGrid(!state.showGrid) }, primary = state.showGrid, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
@@ -361,7 +349,12 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ContextBars(state, Modifier.fillMaxWidth())
                 }
             } else {
-                IconBtn(Ic.Tools, { state.openToolsDrawer() }, active = true, size = 38.dp, iconSize = 21.dp)
+                Box(
+                    Modifier.fillMaxWidth().height(54.dp).clip(CircleShape)
+                        .background(StudioColors.Accent)
+                        .clickable { state.openToolsDrawer() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Ic.Plus, Color.White, 29.dp) }
             }
         }
 
@@ -722,8 +715,7 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 private fun PanelTabBar(state: EditorState) {
     data class DockItem(val tab: PanelTab?, val icon: Ic, val label: String)
     val items = listOf(
-        DockItem(null, Ic.Tools, tr("Design", "طراحی")),
-        DockItem(PanelTab.TIMELINE, Ic.Timeline, tr("Animation", "انیمیشن")),
+        DockItem(PanelTab.TIMELINE, Ic.Timeline, tr("Timeline", "تایم‌لاین")),
         DockItem(PanelTab.EFFECTS, Ic.Effects, tr("Effects", "افکت‌ها")),
         DockItem(PanelTab.LAYERS, Ic.Layers, tr("Layers", "لایه‌ها")),
         DockItem(PanelTab.PROPERTIES, Ic.Props, tr("Properties", "ویژگی‌ها")),
@@ -735,16 +727,13 @@ private fun PanelTabBar(state: EditorState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         items.forEach { item ->
-            val active = if (item.tab == null) state.toolsDrawerOpen else !state.toolsDrawerOpen && (state.panel ?: PanelTab.TIMELINE) == item.tab
+            val active = (state.panel ?: PanelTab.TIMELINE) == item.tab
             Column(
                 Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(10.dp))
                     .background(if (active) StudioColors.AccentSoft else Color.Transparent)
                     .clickable {
-                        if (item.tab == null) state.openToolsDrawer()
-                        else {
-                            state.toolsDrawerOpen = false
-                            state.updatePanel(item.tab)
-                        }
+                        state.toolsDrawerOpen = false
+                        item.tab?.let(state::updatePanel)
                     }.padding(vertical = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
