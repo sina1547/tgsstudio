@@ -151,7 +151,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     if (result == null || result.groups.isEmpty()) unsupported++ else imported++
                 }.onFailure { failed++ }
             }
-            state.openRightPanel(PanelTab.PROPERTIES)
+            state.updatePanel(PanelTab.PROPERTIES)
             state.message = if (lang == Lang.FA) {
                 "$imported فایل SVG وارد شد؛ $unsupported بدون شکل برداری؛ $failed خطا"
             } else {
@@ -183,7 +183,6 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         when {
             state.previewMode -> { state.previewMode = false; state.playing = false }
             state.penPath != null -> { state.penPath = null; state.changed() }
-            state.rightPanelOpen -> state.rightPanelOpen = false
             state.panel != null -> state.updatePanel(null)
             state.tool != Tool.SELECT -> { state.tool = Tool.SELECT; state.changed() }
             state.dirty -> showLeave = true
@@ -194,7 +193,8 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         // Keep the editor viewport and the bottom workspace at fixed dimensions when tabs change.
         // This prevents the composition from jumping or being re-fitted when panels are opened.
-        val workspacePanelHeight = (maxHeight * 0.40f).coerceIn(240.dp, 360.dp)
+        // The lower workspace has a fixed responsive height; it is not draggable.
+        val workspacePanelHeight = (maxHeight * 0.44f).coerceIn(260.dp, 400.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -204,24 +204,19 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
                     Text(m, color = Color.White, fontSize = 13.sp, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelHigh).padding(horizontal = 14.dp, vertical = 8.dp))
                 }
                 if (state.previewMode) IconBtn(Ic.Close, { state.previewMode = false; state.playing = false }, Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99000000), RoundedCornerShape(12.dp)), tint = Color.White)
-                if (!state.previewMode) ContextBars(state, Modifier.align(Alignment.BottomCenter))
+
             }
 
             if (!state.previewMode) {
+                // Playback controls stay directly beneath the canvas; tool actions live in the right dock.
                 Ltr { PlaybackBar(state) }
                 Column(
                     Modifier.fillMaxWidth().height(workspacePanelHeight)
                         .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                         .background(StudioColors.Panel)
                 ) {
-                    PanelTabBar(state)
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        when (state.panel ?: PanelTab.TIMELINE) {
-                            PanelTab.LAYERS -> LayersPanel(state)
-                            PanelTab.PROPERTIES -> PropertiesPanel(state)
-                            PanelTab.TIMELINE -> TimelinePanel(state)
-                            PanelTab.EFFECTS -> EffectsPanel(state)
-                        }
+                        TimelinePanel(state)
                     }
                 }
             }
@@ -248,7 +243,7 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     val centerY = doc.height / 2.0
     fun finishAdd() {
         state.tool = Tool.SELECT
-        state.openRightPanel(PanelTab.PROPERTIES)
+        state.updatePanel(PanelTab.PROPERTIES)
     }
     fun addObject(block: ir.sina.tgsstudio.editor.EditorSession.() -> Unit) {
         state.act(block)
@@ -274,22 +269,30 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
     }
     Box(Modifier.fillMaxSize()) {
         EditorCanvas(state)
+        // Dock is anchored to the canvas edge; contextual controls stay inside this fixed overlay.
         Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
-                .width(if (toolsOpen) 214.dp else 48.dp)
-                .clip(RoundedCornerShape(16.dp))
+            Modifier.align(Alignment.CenterEnd).padding(end = 6.dp)
+                .width(if (toolsOpen) 168.dp else 44.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(StudioColors.Panel.copy(alpha = 0.97f))
                 .padding(5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (toolsOpen) {
                 Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Ic.Tools, StudioColors.Accent, 19.dp)
+                    Icon(Ic.Tools, StudioColors.Accent, 21.dp)
                     Text(tr("Tools", "ابزارها"), color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
                     IconBtn(Ic.Chevron, { state.toolsDrawerOpen = false }, size = 36.dp, iconSize = 18.dp)
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
                 Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
+                    ToolGroupLabel(tr("Create & import", "افزودن و ورود"))
+                    ToolDrawerAction(Ic.Text, tr("Add text", "افزودن متن"), onText)
+                    ToolDrawerAction(Ic.Svg, tr("Import media", "افزودن رسانه"), onSvg)
+                    ToolDrawerAction(Ic.Effects, tr("Effects", "افکت‌ها")) {
+                        state.updatePanel(PanelTab.EFFECTS)
+                    }
+                    Box(Modifier.fillMaxWidth().padding(vertical = 5.dp).height(1.dp).background(StudioColors.Divider))
                     ToolGroupHeader(tr("Selection & navigation", "انتخاب و جابه‌جایی"), "selection" in expandedToolGroups) { toggleToolGroup("selection") }
                     if ("selection" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.SELECT, Ic.Select, tr("Select", "انتخاب"), { state.toolsDrawerOpen = false })
@@ -299,21 +302,21 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     if ("paths" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.PEN, Ic.Pen, tr("Bezier Pen", "قلم بزیه"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.NODE, Ic.Node, tr("Node Editor", "ویرایش گره‌ها"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ADD_NODE, Ic.Add, tr("Add Anchor Point", "افزودن نقطه اتصال"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.DELETE_NODE, Ic.Trash, tr("Delete Anchor Point", "حذف نقطه اتصال"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.SMOOTH_NODE, Ic.Draw, tr("Smooth Point", "نقطه منحنی"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.CORNER_NODE, Ic.Node, tr("Corner Point", "نقطه گوشه"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.LINE, Ic.Draw, tr("Line", "خط"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ADD_NODE, Ic.AddNode, tr("Add Anchor Point", "افزودن نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.DELETE_NODE, Ic.DeleteNode, tr("Delete Anchor Point", "حذف نقطه اتصال"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SMOOTH_NODE, Ic.SmoothNode, tr("Smooth Point", "نقطه منحنی"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.CORNER_NODE, Ic.CornerNode, tr("Corner Point", "نقطه گوشه"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.LINE, Ic.Line, tr("Line", "خط"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
                     if ("shapes" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.Rect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ARC, Ic.Draw, tr("Arc", "کمان"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.SPIRAL, Ic.Draw, tr("Spiral", "مارپیچ"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.ARC, Ic.Arc, tr("Arc", "کمان"), { state.toolsDrawerOpen = false })
+                        ToolDrawerItem(state, Tool.SPIRAL, Ic.Spiral, tr("Spiral", "مارپیچ"), { state.toolsDrawerOpen = false })
                     }
                     ToolGroupHeader(tr("Freehand drawing", "طراحی آزاد"), "drawing" in expandedToolGroups) { toggleToolGroup("drawing") }
                     if ("drawing" in expandedToolGroups) {
@@ -358,43 +361,16 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                         SmallButton(label, { state.setWorkspaceMode(w); state.toolsDrawerOpen = false }, primary = state.workspace == w, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                     }
+                    Box(Modifier.fillMaxWidth().padding(vertical = 5.dp).height(1.dp).background(StudioColors.Divider))
+                    ToolGroupLabel(tr("Tool settings", "تنظیمات ابزار انتخاب‌شده"))
+                    ContextBars(state, Modifier.fillMaxWidth())
                 }
             } else {
                 IconBtn(Ic.Tools, { state.openToolsDrawer() }, active = true, size = 38.dp, iconSize = 21.dp)
             }
         }
 
-        Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
-                .width(if (state.rightPanelOpen) 276.dp else 46.dp)
-                .then(if (state.rightPanelOpen) Modifier.fillMaxHeight(0.82f).heightIn(max = 620.dp) else Modifier.heightIn(min = 96.dp, max = 180.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(StudioColors.Panel.copy(alpha = 0.97f))
-                .padding(5.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (state.rightPanelOpen) {
-                Row(Modifier.fillMaxWidth().padding(start = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (state.rightPanelTab == PanelTab.LAYERS) Ic.Layers else Ic.Props, StudioColors.Accent, 19.dp)
-                    Text(
-                        if (state.rightPanelTab == PanelTab.LAYERS) tr("Layers", "لایه‌ها") else tr("Properties", "ویژگی‌ها"),
-                        color = StudioColors.TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 8.dp),
-                    )
-                    IconBtn(Ic.Chevron, { state.rightPanelOpen = false }, size = 36.dp, iconSize = 18.dp)
-                }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    IconBtn(Ic.Layers, { state.rightPanelTab = PanelTab.LAYERS }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 19.dp)
-                    IconBtn(Ic.Props, { state.rightPanelTab = PanelTab.PROPERTIES }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 19.dp)
-                }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    if (state.rightPanelTab == PanelTab.LAYERS) LayersPanel(state) else PropertiesPanel(state)
-                }
-            } else {
-                IconBtn(Ic.Layers, { state.openRightPanel(PanelTab.LAYERS) }, active = state.rightPanelTab == PanelTab.LAYERS, size = 38.dp, iconSize = 21.dp)
-                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, active = state.rightPanelTab == PanelTab.PROPERTIES, size = 38.dp, iconSize = 21.dp)
-            }
-        }
+
     }
 }
 
@@ -425,11 +401,11 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
                 state.tool = tool
                 if (tool != Tool.PEN) state.penPath = null
                 state.changed()
-                close()
+                // Keep the right dock open so the selected tool's settings remain available.
             }.padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, if (active) StudioColors.Accent else StudioColors.TextPrimary, 19.dp)
+        Icon(icon, if (active) StudioColors.Accent else StudioColors.TextPrimary, 21.dp)
         Text(label, color = if (active) StudioColors.Accent else StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.padding(start = 9.dp))
         if (active) {
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
@@ -454,10 +430,10 @@ private fun ToolDrawerAction(icon: Ic, label: String, onClick: () -> Unit) {
 private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit) {
     val tick = state.tick
     Row(
-        Modifier.fillMaxWidth().height(52.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBtn(Ic.Back, onBack, size = 40.dp)
+        IconBtn(Ic.Back, onBack, size = 42.dp, iconSize = 22.dp)
         Column(
             Modifier.weight(1f).clickable(onClick = onRename).padding(start = 7.dp, end = 4.dp),
             verticalArrangement = Arrangement.Center,
@@ -472,10 +448,10 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
             )
         }
         Box(Modifier.width(1.dp).height(28.dp).background(StudioColors.Divider))
-        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Export, onExport, size = 38.dp, iconSize = 19.dp, tint = StudioColors.Accent)
+        IconBtn(Ic.Undo, { state.act { undo() } }, enabled = state.session.history.canUndo && tick >= 0, size = 40.dp, iconSize = 21.dp)
+        IconBtn(Ic.Redo, { state.act { redo() } }, enabled = state.session.history.canRedo && tick >= 0, size = 40.dp, iconSize = 21.dp)
+        IconBtn(Ic.Save, onSave, enabled = state.dirty, size = 40.dp, iconSize = 21.dp)
+        IconBtn(Ic.Export, onExport, size = 40.dp, iconSize = 21.dp, tint = StudioColors.Accent)
         Box {
             IconBtn(Ic.More, onMore, size = 38.dp)
             DropdownMenu(menuOpen, onMenuClose, containerColor = StudioColors.PanelRaised) {
@@ -559,6 +535,19 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
     val sel = state.session.selection
     Column(modifier.padding(bottom = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val pen = state.penPath
+        if (state.tool == Tool.SELECT) {
+            Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(tr("Selection", "انتخاب"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                SmallButton(tr(if (state.multiSelect) "Multi-select ✓" else "Multi-select", if (state.multiSelect) "انتخاب چندگانه ✓" else "انتخاب چندگانه"), { state.multiSelect = !state.multiSelect }, primary = state.multiSelect)
+                SmallButton(tr(if (state.snapToGrid) "Snap ✓" else "Snap", if (state.snapToGrid) "چسبیدن ✓" else "چسبیدن"), { state.persistSnapToGrid(!state.snapToGrid) }, primary = state.snapToGrid)
+            }
+        }
+        if (state.tool == Tool.HAND) {
+            Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("Canvas navigation", "ناوبری بوم"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                SmallButton(tr("Fit canvas", "برازش بوم"), { state.fit(state.fitSize.x, state.fitSize.y) }, ic = Ic.Fit)
+            }
+        }
         if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
@@ -608,7 +597,8 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(if (pen == null) tr("Tap to place points; drag to curve. Tap the first point to close.", "برای گذاشتن نقطه بزنید؛ برای منحنی بکشید. برای بستن، نقطهٔ اول را بزنید.") else tr("${pen.count} points", "${pen.count} نقطه"), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp).align(Alignment.CenterVertically))
                     if (pen != null) {
                         SmallButton(tr("Done", "پایان"), { state.act { addFreeform(pen, filled = false) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, primary = true, enabled = pen.count >= 2)
-                        SmallButton(tr("Close", "بستن"), { state.act { addFreeform(PathOps.setClosed(pen, true)) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, enabled = pen.count >= 3)
+                        SmallButton(tr(if (state.penFill) "Fill on close ✓" else "Fill on close", if (state.penFill) "پرکردن هنگام بستن ✓" else "پرکردن هنگام بستن"), { state.penFill = !state.penFill }, primary = state.penFill, enabled = pen.count >= 3)
+                        SmallButton(tr("Close", "بستن"), { state.act { addFreeform(PathOps.setClosed(pen, true), filled = state.penFill) }; state.penPath = null; state.tool = Tool.SELECT; state.changed() }, enabled = pen.count >= 3)
                         SmallButton(tr("Cancel", "انصراف"), { state.penPath = null; state.changed() })
                     }
                 }
@@ -636,10 +626,60 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 IconBtn(Ic.Copy, { state.act { duplicateSelection() } }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Up, { sel.singleOrNull()?.let { t -> state.act { move(t, -1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Down, { sel.singleOrNull()?.let { t -> state.act { move(t, 1) } } }, enabled = sel.size == 1, size = 40.dp, iconSize = 20.dp)
-                IconBtn(Ic.Props, { state.openRightPanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
+                IconBtn(Ic.Props, { state.updatePanel(PanelTab.PROPERTIES) }, size = 40.dp, iconSize = 20.dp)
                 IconBtn(Ic.Trash, { state.act { deleteSelection() }; state.message = if (state.isFa) "حذف شد — با Undo برمی‌گردد" else "Deleted — Undo brings it back" }, size = 40.dp, iconSize = 20.dp, tint = StudioColors.Danger)
             }
         }
+    }
+}
+
+@Composable
+private fun QuickActionBar(state: EditorState, onText: () -> Unit, onMedia: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).background(StudioColors.Background)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        QuickAction(Ic.Tools, tr("Add", "افزودن"), state.toolsDrawerOpen, Modifier.weight(1f)) {
+            state.toolsDrawerOpen = !state.toolsDrawerOpen
+        }
+        QuickAction(Ic.Text, tr("Text", "متن"), false, Modifier.weight(1f), onText)
+        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
+            state.tool = Tool.RECT
+            state.toolsDrawerOpen = false
+            state.changed()
+        }
+        QuickAction(Ic.Effects, tr("Effects", "افکت"), state.panel == PanelTab.EFFECTS, Modifier.weight(1f)) {
+            state.updatePanel(PanelTab.EFFECTS)
+        }
+        QuickAction(Ic.Svg, tr("Media", "رسانه"), false, Modifier.weight(1f), onMedia)
+    }
+}
+
+@Composable
+private fun QuickAction(
+    icon: Ic,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier.clip(RoundedCornerShape(10.dp))
+            .background(if (selected) StudioColors.AccentSoft else StudioColors.Panel)
+            .clickable(onClick = onClick)
+            .padding(vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, if (selected) StudioColors.Accent else StudioColors.TextPrimary, 19.dp)
+        Text(
+            label,
+            color = if (selected) StudioColors.Accent else StudioColors.TextMuted,
+            fontSize = 9.sp,
+            maxLines = 1,
+        )
     }
 }
 
@@ -648,27 +688,27 @@ private fun PlaybackBar(state: EditorState) {
     val doc = state.session.doc
     val lo = doc.inPoint.toFloat(); val hi = max(lo + 1f, (doc.outPoint - 1).toFloat())
     Row(
-        Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
+        Modifier.fillMaxWidth().height(42.dp).background(StudioColors.Panel).padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 38.dp, iconSize = 19.dp)
-        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 40.dp, iconSize = 19.dp)
-        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 38.dp, iconSize = 19.dp)
-        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 38.dp, iconSize = 18.dp)
+        IconBtn(Ic.Prev, { state.playing = false; state.seek(Math.floor(state.frame) - 1) }, size = 36.dp, iconSize = 19.dp)
+        IconBtn(if (state.playing) Ic.Pause else Ic.Play, { state.playing = !state.playing }, active = true, size = 38.dp, iconSize = 20.dp)
+        IconBtn(Ic.Next, { state.playing = false; state.seek(Math.floor(state.frame) + 1) }, size = 36.dp, iconSize = 19.dp)
+        IconBtn(Ic.Loop, { state.loop = !state.loop }, active = state.loop, size = 36.dp, iconSize = 19.dp)
         Slider(
             value = state.frame.toFloat().coerceIn(lo, hi), onValueChange = { state.playing = false; state.seek(Math.rint(it.toDouble())) }, valueRange = lo..hi,
             colors = SliderDefaults.colors(thumbColor = StudioColors.Accent, activeTrackColor = StudioColors.Accent, inactiveTrackColor = StudioColors.PanelHigh),
             modifier = Modifier.weight(1f).padding(horizontal = 5.dp),
         )
         Column(
-            Modifier.clip(RoundedCornerShape(9.dp)).background(StudioColors.PanelHigh).padding(horizontal = 8.dp, vertical = 5.dp),
+            Modifier.clip(RoundedCornerShape(8.dp)).background(StudioColors.PanelHigh).padding(horizontal = 6.dp, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 12.sp)
-            Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 9.sp)
+            Text(state.frame.toInt().toString(), color = StudioColors.TextPrimary, fontSize = 10.sp)
+            Text("/ ${(doc.outPoint - 1).toInt()}", color = StudioColors.TextMuted, fontSize = 8.sp)
         }
-        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 3.dp))
+        SmallButton("${fmt(doc.frameRate, 0)} fps", { state.act { setFrameRate(if (doc.frameRate == 60.0) 30.0 else 60.0) } }, modifier = Modifier.padding(start = 2.dp))
     }
 }
 
@@ -685,31 +725,38 @@ private fun PanelHandle(state: EditorState, maxDp: Float) {
 
 @Composable
 private fun PanelTabBar(state: EditorState) {
-    val tabs = listOf(
-        Triple(PanelTab.LAYERS, Ic.Layers, tr("Layers", "لایه‌ها")),
-        Triple(PanelTab.PROPERTIES, Ic.Props, tr("Properties", "ویژگی‌ها")),
-        Triple(PanelTab.TIMELINE, Ic.Timeline, tr("Timeline", "تایم‌لاین")),
-        Triple(PanelTab.EFFECTS, Ic.Effects, tr("Effects", "افکت‌ها")),
+    data class DockItem(val tab: PanelTab?, val icon: Ic, val label: String)
+    val items = listOf(
+        DockItem(null, Ic.Tools, tr("Design", "طراحی")),
+        DockItem(PanelTab.TIMELINE, Ic.Timeline, tr("Animation", "انیمیشن")),
+        DockItem(PanelTab.EFFECTS, Ic.Effects, tr("Effects", "افکت‌ها")),
+        DockItem(PanelTab.LAYERS, Ic.Layers, tr("Layers", "لایه‌ها")),
+        DockItem(PanelTab.PROPERTIES, Ic.Props, tr("Properties", "ویژگی‌ها")),
     )
     Row(
-        Modifier.fillMaxWidth().height(40.dp).background(StudioColors.Panel)
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxWidth().height(54.dp).background(StudioColors.Panel)
+            .padding(horizontal = 5.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { (tab, icon, label) ->
-            val active = (state.panel ?: PanelTab.TIMELINE) == tab
-            Row(
-                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(9.dp))
+        items.forEach { item ->
+            val active = if (item.tab == null) state.toolsDrawerOpen else !state.toolsDrawerOpen && (state.panel ?: PanelTab.TIMELINE) == item.tab
+            Column(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(10.dp))
                     .background(if (active) StudioColors.AccentSoft else Color.Transparent)
-                    .clickable { state.updatePanel(tab) }
-                    .padding(horizontal = 3.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                    .clickable {
+                        if (item.tab == null) state.openToolsDrawer()
+                        else {
+                            state.toolsDrawerOpen = false
+                            state.updatePanel(item.tab)
+                        }
+                    }.padding(vertical = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Icon(icon, if (active) StudioColors.Accent else StudioColors.TextMuted, 17.dp)
-                Text(label, color = if (active) StudioColors.Accent else StudioColors.TextMuted,
-                    fontSize = 10.sp, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+                Icon(item.icon, if (active) StudioColors.Accent else StudioColors.TextMuted, 18.dp)
+                Text(item.label, color = if (active) StudioColors.Accent else StudioColors.TextMuted,
+                    fontSize = 9.sp, maxLines = 1)
             }
         }
     }

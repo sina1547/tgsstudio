@@ -18,6 +18,7 @@ import ir.sina.tgsstudio.data.ProjectStore
 import ir.sina.tgsstudio.document.DocumentException
 import ir.sina.tgsstudio.editor.Creator
 import ir.sina.tgsstudio.editor.EditorSession
+import ir.sina.tgsstudio.export.Exporter
 import ir.sina.tgsstudio.parser.TgsCodec
 import ir.sina.tgsstudio.ui.EditorScreen
 import ir.sina.tgsstudio.ui.EditorState
@@ -34,6 +35,7 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
     val lang = remember(setting) { prefs.language() }
     var editor by remember { mutableStateOf<EditorState?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
+    var pendingExport by remember { mutableStateOf<Pair<ProjectInfo, String>?>(null) }
 
     fun toast(fa: String, en: String) = Toast.makeText(context, if (lang == Lang.FA) fa else en, Toast.LENGTH_LONG).show()
 
@@ -50,12 +52,18 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
         var failed = 0
         uris.forEach { uri ->
             runCatching {
-                val doc = context.contentResolver.openInputStream(uri)?.use { TgsCodec.read(it) } ?: error("no stream")
-                val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                val displayName = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                     if (c.moveToFirst()) c.getString(0) else null
-                }?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Imported"
-                doc.name = name
-                store.create(doc, name)
+                } ?: "Imported.tgs"
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("no stream")
+                if (displayName.endsWith(".tgsproj", ignoreCase = true)) {
+                    store.importProjectArchive(bytes)
+                } else {
+                    val name = displayName.substringBeforeLast('.').takeIf { it.isNotBlank() } ?: "Imported"
+                    val doc = TgsCodec.read(bytes)
+                    doc.name = name
+                    store.create(doc, name)
+                }
             }.onSuccess { info ->
                 if (first == null) first = info
                 imported++
@@ -65,6 +73,38 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
         first?.let(::open)
         if (failed > 0) toast("$imported فایل وارد شد؛ $failed فایل نامعتبر بود", "$imported imported; $failed file(s) could not be opened")
         else toast("$imported فایل وارد شد", "$imported file(s) imported")
+    }
+
+    val projectExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+        val pending = pendingExport
+        pendingExport = null
+        if (uri != null && pending != null) {
+            val (project, format) = pending
+            val success = runCatching {
+                val bytes = when (format) {
+                    "project" -> store.exportProjectArchive(project.id)
+                    "tgs" -> Exporter.tgs(store.load(project.id))
+                    "json" -> Exporter.lottieJson(store.load(project.id)).toByteArray(Charsets.UTF_8)
+                    "svg" -> Exporter.svgFrame(store.load(project.id), 0.0).toByteArray(Charsets.UTF_8)
+                    else -> error("Unsupported export format")
+                }
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("no output stream")
+            }.isSuccess
+            if (success) toast("خروجی ذخیره شد", "Export saved")
+            else toast("ذخیره خروجی ناموفق بود", "Export failed")
+        }
+    }
+
+    fun exportProject(project: ProjectInfo, format: String) {
+        pendingExport = project to format
+        val extension = when (format) {
+            "project" -> "tgsproj"
+            "tgs" -> "tgs"
+            "json" -> "json"
+            "svg" -> "svg"
+            else -> "bin"
+        }
+        projectExportLauncher.launch("${project.name}.$extension")
     }
 
     WithLanguage(lang) {
@@ -77,6 +117,9 @@ fun StudioApp(onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit)
                 onImport = { importer.launch(arrayOf("application/json", "application/gzip", "application/octet-stream", "*/*")) },
                 onRename = { p, n -> store.rename(p.id, n); refresh++ },
                 onDelete = { p -> store.delete(p.id); refresh++ },
+                onDeleteSelected = { selected -> store.deleteMany(selected.map { it.id }.toSet()); refresh++ },
+                onDuplicate = { p -> if (store.duplicate(p.id) != null) refresh++ else toast("کپی پروژه ناموفق بود", "Couldn't duplicate project") },
+                onExport = ::exportProject,
                 onLanguage = { s -> prefs.languageSetting = s; setting = s },
                 themeSetting = prefs.themeSetting, accent = prefs.themeAccent,
                 onThemeChange = onThemeChange, onAccentChange = onAccentChange,

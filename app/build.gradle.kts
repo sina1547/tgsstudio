@@ -23,8 +23,8 @@ android {
         applicationId = "ir.sina.tgsstudio"
         minSdk = 24
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.10.0"
+        versionCode = 38
+        versionName = "0.25.0"
     }
 
     signingConfigs {
@@ -52,7 +52,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {

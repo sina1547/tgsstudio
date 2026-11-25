@@ -39,8 +39,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var rectRoundness by mutableFloatStateOf(24f)
     var arcDegrees by mutableIntStateOf(270)
     var spiralTurns by mutableIntStateOf(3)
-    fun openToolsDrawer() { rightPanelOpen = false; toolsDrawerOpen = true }
-    fun openRightPanel(tab: PanelTab = rightPanelTab) { toolsDrawerOpen = false; rightPanelTab = tab; rightPanelOpen = true }
+    fun openToolsDrawer() { toolsDrawerOpen = true }
     var showGrid by mutableStateOf(prefs.showGrid)
     var showRulers by mutableStateOf(prefs.showRulers)
     var snapToGrid by mutableStateOf(prefs.snapToGrid)
@@ -49,8 +48,6 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     fun persistShowRulers(value: Boolean) { showRulers = value; prefs.showRulers = value }
     fun persistSnapToGrid(value: Boolean) { snapToGrid = value; prefs.snapToGrid = value }
     fun persistGridSpacing(value: Float) { gridSpacing = value.coerceIn(5f, 500f); prefs.gridSpacing = gridSpacing }
-    var rightPanelOpen by mutableStateOf(false)
-    var rightPanelTab by mutableStateOf(PanelTab.LAYERS)
     var workspace by mutableStateOf(runCatching { Workspace.valueOf(prefs.workspace.uppercase()) }.getOrDefault(Workspace.DESIGN))
     var panel by mutableStateOf<PanelTab?>(if (prefs.panelOpen) runCatching { PanelTab.valueOf(prefs.openPanel.uppercase()) }.getOrNull() else PanelTab.TIMELINE)
     var panelHeightDp by mutableFloatStateOf(prefs.panelHeightDp)
@@ -110,6 +107,7 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     var penWidth by mutableFloatStateOf(8f)
     var penOpacity by mutableFloatStateOf(100f)
     var penWriteOn by mutableStateOf(false)
+    var penFill by mutableStateOf(false)
     var penSpeed by mutableFloatStateOf(10f)          // pixels of path drawn per frame during write-on
     var drawPoints by mutableStateOf<List<Offset>>(emptyList())
     var penNextStart: Double? = null
@@ -138,16 +136,9 @@ class EditorState(val projectId: String, var projectName: String, val session: E
     fun setWorkspaceMode(w: Workspace) {
         workspace = w; prefs.workspace = w.name.lowercase()
         when (w) {
-            Workspace.DESIGN -> { toolsDrawerOpen = false; rightPanelTab = PanelTab.LAYERS; rightPanelOpen = true; updatePanel(null) }
+            Workspace.DESIGN -> { toolsDrawerOpen = false; updatePanel(PanelTab.LAYERS) }
             Workspace.ANIMATION -> updatePanel(PanelTab.TIMELINE)
-            Workspace.ADVANCED -> {
-                toolsDrawerOpen = false
-                if (panel == PanelTab.LAYERS || panel == PanelTab.PROPERTIES) {
-                    rightPanelTab = panel!!
-                    updatePanel(null)
-                }
-                rightPanelOpen = true
-            }
+            Workspace.ADVANCED -> { toolsDrawerOpen = false; updatePanel(PanelTab.EFFECTS) }
         }
     }
 }

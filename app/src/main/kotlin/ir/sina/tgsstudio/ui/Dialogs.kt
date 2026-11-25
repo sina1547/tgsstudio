@@ -3,6 +3,7 @@ package ir.sina.tgsstudio.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,8 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sina.tgsstudio.BuildConfig
 import ir.sina.tgsstudio.document.LottieDocument
 import ir.sina.tgsstudio.export.Exporter
 import ir.sina.tgsstudio.export.Issue
@@ -59,7 +64,8 @@ fun issueText(i: Issue): String = when (i.code) {
     else -> i.code
 }
 
-enum class ExportKind(val mime: String, val ext: String) { TGS("application/gzip", "tgs"), JSON("application/json", "json"), SVG("image/svg+xml", "svg") }
+// TGS payload is gzip-compressed, but its document filename must remain .tgs. Avoid application/gzip because some SAF providers append .gz.
+enum class ExportKind(val mime: String, val ext: String) { TGS("application/octet-stream", "tgs"), JSON("application/json", "json"), SVG("image/svg+xml", "svg") }
 
 /** Checks the document against Telegram's sticker limits, shows every problem, and lets the user export anyway. */
 @Composable
@@ -99,6 +105,16 @@ fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss:
 
 @Composable
 fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: String, onThemeChange: (String) -> Unit, accent: String, onAccentChange: (String) -> Unit, onDismiss: () -> Unit) {
+    var themeMenuExpanded by remember { mutableStateOf(false) }
+    val themeOptions = listOf(
+        "dark" to tr("Dark", "تیره"),
+        "light" to tr("Light", "روشن"),
+        "neon" to "Neon",
+        "custom" to tr("Custom", "سفارشی"),
+    )
+    val selectedTheme = themeOptions.firstOrNull { it.first == currentTheme }?.second
+        ?: tr("Dark", "تیره")
+
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { DialogTitle(tr("Settings", "تنظیمات")) },
@@ -113,12 +129,30 @@ fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: St
                     ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (current == code) Icon(Ic.Check, Color.White, 18.dp) }
                 }
                 Text(tr("Workspace theme", "تم محیط"), color = StudioColors.TextMuted, fontSize = 13.sp)
-                listOf("dark" to tr("Dark", "تیره"), "light" to tr("Light", "روشن"), "neon" to "Neon", "custom" to tr("Custom", "سفارشی")).forEach { (code, label) ->
+                Box(Modifier.fillMaxWidth()) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (currentTheme == code) StudioColors.AccentSoft else StudioColors.PanelRaised)
-                            .clickable { onThemeChange(code) }.padding(12.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(StudioColors.PanelRaised)
+                            .clickable { themeMenuExpanded = true }
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                    ) { Text(label, color = StudioColors.TextPrimary, modifier = Modifier.weight(1f)); if (currentTheme == code) Icon(Ic.Check, Color.White, 18.dp) }
+                    ) {
+                        Text(tr("Theme", "پوسته"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
+                        Text(selectedTheme, color = StudioColors.Accent, fontSize = 13.sp)
+                        Text("  ▾", color = StudioColors.TextMuted, fontSize = 14.sp)
+                    }
+                    DropdownMenu(
+                        expanded = themeMenuExpanded,
+                        onDismissRequest = { themeMenuExpanded = false },
+                    ) {
+                        themeOptions.forEach { (code, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = StudioColors.TextPrimary) },
+                                leadingIcon = { if (currentTheme == code) Icon(Ic.Check, StudioColors.Accent, 18.dp) },
+                                onClick = { onThemeChange(code); themeMenuExpanded = false },
+                            )
+                        }
+                    }
                 }
                 if (currentTheme == "custom") {
                     OutlinedTextField(
@@ -139,13 +173,24 @@ fun SettingsDialog(current: String, onChange: (String) -> Unit, currentTheme: St
 
 @Composable
 fun AboutDialog(onDismiss: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = StudioColors.Panel,
         title = { DialogTitle("SINA TGS Studio") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tr("Version 0.9.8", "نسخهٔ ۰٫۹٫۸"), color = StudioColors.TextMuted)
+                Text(tr("Version ${BuildConfig.VERSION_NAME}", "نسخهٔ ${BuildConfig.VERSION_NAME}"), color = StudioColors.TextMuted)
                 Text(tr("An offline editor for Telegram animated stickers (TGS). Everything runs on your phone; no account or internet is needed.", "ویرایشگر آفلاین استیکرهای متحرک تلگرام (TGS). همه‌چیز روی گوشی شما اجرا می‌شود؛ حساب کاربری یا اینترنت لازم نیست."), color = StudioColors.TextPrimary, fontSize = 14.sp)
+                Text(
+                    "✉  sinalatifi1547@gmail.com",
+                    color = StudioColors.Accent,
+                    modifier = androidx.compose.ui.Modifier.clickable { uriHandler.openUri("mailto:sinalatifi1547@gmail.com") },
+                )
+                Text(
+                    "Telegram  @sinalatifi1",
+                    color = StudioColors.Accent,
+                    modifier = androidx.compose.ui.Modifier.clickable { uriHandler.openUri("https://t.me/sinalatifi1") },
+                )
             }
         },
         confirmButton = { TextButton(onDismiss) { Text(tr("Close", "بستن"), color = StudioColors.Accent) } },

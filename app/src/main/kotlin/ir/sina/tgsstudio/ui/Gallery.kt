@@ -1,11 +1,9 @@
 package ir.sina.tgsstudio.ui
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,19 +16,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,15 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.sina.tgsstudio.data.ProjectInfo
@@ -57,104 +51,301 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun Logo(size: Dp) {
-    Canvas(Modifier.size(size)) {
+fun Logo(size: androidx.compose.ui.unit.Dp) {
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
         val s = this.size.minDimension
         drawRoundRect(Brush.linearGradient(listOf(Color(0xFF1E7BFF), Color(0xFF7C4DDB))), size = this.size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.26f))
-        val p = Path().apply { moveTo(s * 0.24f, s * 0.70f); cubicTo(s * 0.32f, s * 0.28f, s * 0.62f, s * 0.28f, s * 0.78f, s * 0.52f) }
-        drawPath(p, Color.White, style = Stroke(width = s * 0.07f, cap = StrokeCap.Round))
-        drawCircle(Color.White, s * 0.06f, Offset(s * 0.24f, s * 0.70f)); drawCircle(Color.White, s * 0.06f, Offset(s * 0.78f, s * 0.52f))
+        val p = androidx.compose.ui.graphics.Path().apply { moveTo(s * 0.24f, s * 0.70f); cubicTo(s * 0.32f, s * 0.28f, s * 0.62f, s * 0.28f, s * 0.78f, s * 0.52f) }
+        drawPath(p, Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(width = s * 0.07f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        drawCircle(Color.White, s * 0.06f, androidx.compose.ui.geometry.Offset(s * 0.24f, s * 0.70f))
+        drawCircle(Color.White, s * 0.06f, androidx.compose.ui.geometry.Offset(s * 0.78f, s * 0.52f))
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GalleryScreen(
     store: ProjectStore, refresh: Int, setting: String,
     onOpen: (ProjectInfo) -> Unit, onNew: (String, Int, Int, Double, String) -> Unit, onImport: () -> Unit,
-    onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onLanguage: (String) -> Unit,
+    onRename: (ProjectInfo, String) -> Unit, onDelete: (ProjectInfo) -> Unit, onDeleteSelected: (List<ProjectInfo>) -> Unit, onDuplicate: (ProjectInfo) -> Unit, onExport: (ProjectInfo, String) -> Unit, onLanguage: (String) -> Unit,
     themeSetting: String, accent: String, onThemeChange: (String) -> Unit, onAccentChange: (String) -> Unit,
 ) {
     val projects = remember(refresh) { store.list() }
     var showNew by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
-    var menuFor by remember { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf<ProjectInfo?>(null) }
     var deleting by remember { mutableStateOf<ProjectInfo?>(null) }
-    val fmtDate = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault()) }
 
-    LazyVerticalGrid(
-        GridCells.Adaptive(150.dp),
-        Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding(),
-        contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-                        .background(Brush.linearGradient(listOf(StudioColors.PanelRaised, StudioColors.Panel, StudioColors.AccentSoft)))
-                        .padding(16.dp),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Logo(52.dp)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("SINA TGS STUDIO", color = StudioColors.TextPrimary, fontSize = 19.sp)
-                                Text(tr("VECTOR  ·  MOTION  ·  TGS", "وکتور  ·  موشن  ·  TGS"), color = StudioColors.Accent, fontSize = 10.sp)
-                            }
-                            IconBtn(Ic.Settings, { showSettings = true }, size = 38.dp)
-                            IconBtn(Ic.Info, { showAbout = true }, size = 38.dp)
-                        }
-                        Text(
-                            tr("A creative workspace for Telegram motion graphics", "فضای حرفه‌ای طراحی و ساخت موشن‌گرافیک تلگرام"),
-                            color = StudioColors.TextMuted, fontSize = 12.sp,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallButton(tr("New Project", "پروژهٔ جدید"), { showNew = true }, Modifier.weight(1f).height(44.dp), primary = true, ic = Ic.Plus)
-                            SmallButton(tr("Import TGS", "ورود فایل TGS"), onImport, Modifier.weight(1f).height(44.dp), ic = Ic.Folder)
-                        }
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(tr("Your workspace", "فضای کاری شما"), color = StudioColors.TextPrimary, fontSize = 17.sp)
-                        Text(tr("Recent projects", "پروژه‌های اخیر"), color = StudioColors.TextMuted, fontSize = 11.sp)
-                    }
-                    Text("${projects.size}  ${tr("PROJECTS", "پروژه")}", color = StudioColors.Accent, fontSize = 10.sp)
-                }
-                if (projects.isEmpty()) Text(tr("No projects yet. Create one or import a .tgs file to get started.", "هنوز پروژه‌ای نیست. برای شروع پروژه بسازید یا فایل TGS وارد کنید."), color = StudioColors.TextMuted, fontSize = 13.sp)
-            }
-        }
-        items(projects, key = { it.id }) { p ->
-            val thumb = remember(p.id, p.modified) { store.thumbnail(p.id)?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
-            Column(
-                Modifier.clip(RoundedCornerShape(18.dp)).background(StudioColors.Panel)
-                    .combinedClickable(onClick = { onOpen(p) }, onLongClick = { menuFor = p.id }),
-            ) {
-                Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Brush.linearGradient(listOf(StudioColors.CheckerA, StudioColors.CheckerB))), contentAlignment = Alignment.Center) {
-                    if (thumb != null) Image(thumb, null, Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit) else Icon(Ic.Shape, StudioColors.TextMuted, 36.dp)
-                    Box(Modifier.align(Alignment.TopEnd)) {
-                        DropdownMenu(menuFor == p.id, { menuFor = null }, containerColor = StudioColors.PanelRaised) {
-                            DropdownMenuItem(text = { Text(tr("Rename", "تغییر نام"), color = StudioColors.TextPrimary) }, onClick = { menuFor = null; renaming = p })
-                            DropdownMenuItem(text = { Text(tr("Delete", "حذف"), color = StudioColors.Danger) }, onClick = { menuFor = null; deleting = p })
-                        }
-                    }
-                }
-                Column(Modifier.padding(10.dp)) {
-                    Text(p.name, color = StudioColors.TextPrimary, fontSize = 14.sp, maxLines = 1)
-                    Text(fmtDate.format(Date(p.modified)), color = StudioColors.TextMuted, fontSize = 11.sp, maxLines = 1)
-                }
-            }
-        }
-    }
+    HomeWorkspace(
+        projects = projects,
+        store = store,
+        onOpen = onOpen,
+        onNew = { showNew = true },
+        onImport = onImport,
+        onSettings = { showSettings = true },
+        onAbout = { showAbout = true },
+        onDelete = { deleting = it },
+        onDeleteSelected = onDeleteSelected,
+        onDuplicate = onDuplicate,
+        onExport = onExport,
+    )
 
     if (showNew) NewProjectDialog({ showNew = false }) { n, w, h, fps, bg -> showNew = false; onNew(n, w, h, fps, bg) }
     renaming?.let { p -> NameDialog(tr("Rename", "تغییر نام"), p.name, { n -> onRename(p, n); renaming = null }, { renaming = null }) }
-    deleting?.let { p -> ConfirmDialog(tr("Delete project?", "پروژه حذف شود؟"), tr("“${p.name}” will be removed from this phone.", "«${p.name}» از این گوشی پاک می‌شود."), tr("Delete", "حذف"), { onDelete(p); deleting = null }, { deleting = null }) }
+    deleting?.let { p -> ConfirmDialog(tr("Delete project?", "پروژه حذف شود؟"), "“" + p.name + "” " + tr("will be removed from this phone.", "از این گوشی پاک می‌شود."), tr("Delete", "حذف"), { onDelete(p); deleting = null }, { deleting = null }) }
     if (showSettings) SettingsDialog(setting, onLanguage, themeSetting, onThemeChange, accent, onAccentChange) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
 }
+
+@Composable
+private fun HomeWorkspace(
+    projects: List<ProjectInfo>,
+    store: ProjectStore,
+    onOpen: (ProjectInfo) -> Unit,
+    onNew: () -> Unit,
+    onImport: () -> Unit,
+    onSettings: () -> Unit,
+    onAbout: () -> Unit,
+    onDelete: (ProjectInfo) -> Unit,
+    onDeleteSelected: (List<ProjectInfo>) -> Unit,
+    onDuplicate: (ProjectInfo) -> Unit,
+    onExport: (ProjectInfo, String) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var projectsTab by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
+    var showBulkDelete by remember { mutableStateOf(false) }
+    val filtered = remember(projects, query) {
+        if (query.isBlank()) projects else projects.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    }
+    val visible = filtered.take(6)
+    val selectedProjects = projects.filter { it.id in selectedIds }
+    val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()) }
+
+    Box(Modifier.fillMaxSize().background(StudioColors.Background).systemBarsPadding()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 112.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Logo(46.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("TGS STUDIO", color = StudioColors.TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text(tr("VECTOR  •  MOTION  •  CREATIVE", "وکتور  •  موشن  •  طراحی"), color = StudioColors.Accent, fontSize = 9.sp, letterSpacing = 1.sp)
+                    }
+                    IconBtn(Ic.Info, onAbout, size = 40.dp)
+                }
+            }
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    placeholder = { Text(tr("Search projects...", "جستجوی پروژه‌ها..."), color = StudioColors.TextMuted, fontSize = 13.sp) },
+                    leadingIcon = { Icon(Ic.Tools, StudioColors.TextMuted, 19.dp) },
+                )
+            }
+            if (selectionMode) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(StudioColors.Panel).padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            tr("${selectedIds.size} selected", "${selectedIds.size} مورد انتخاب شده"),
+                            color = StudioColors.TextPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { selectedIds = visible.map { it.id }.toSet() }) {
+                            Text(tr("Select all", "انتخاب همه"), color = StudioColors.Accent, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = { selectedIds = emptySet(); selectionMode = false }) {
+                            Text(tr("Cancel", "لغو"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                        }
+                        TextButton(enabled = selectedIds.isNotEmpty(), onClick = { showBulkDelete = true }) {
+                            Text(tr("Delete", "حذف"), color = if (selectedIds.isNotEmpty()) Color(0xFFFF6B6B) else StudioColors.TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(tr("Recent Projects", "پروژه‌های اخیر"), color = StudioColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tr("Showing up to 6 projects", "نمایش حداکثر ۶ پروژه"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    }
+                    if (!selectionMode) {
+                        TextButton(onClick = { selectionMode = true; selectedIds = emptySet() }) {
+                            Icon(Ic.Select, StudioColors.Accent, 16.dp)
+                            Text(tr("Select", "انتخاب"), color = StudioColors.Accent, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            if (visible.isEmpty()) {
+                item {
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(StudioColors.Panel).padding(22.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        Icon(Ic.Folder, StudioColors.TextMuted, 34.dp)
+                        Text(if (query.isBlank()) tr("No projects yet", "هنوز پروژه‌ای ندارید") else tr("No matching projects", "پروژه‌ای پیدا نشد"), color = StudioColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(if (query.isBlank()) tr("Create a project or open a TGS file to get started.", "برای شروع پروژه بسازید یا یک فایل TGS باز کنید.") else tr("Try another search term.", "عبارت دیگری را جستجو کنید."), color = StudioColors.TextMuted, fontSize = 11.sp)
+                    }
+                }
+            } else {
+                items(visible, key = { it.id }) { project ->
+                    val bitmap = remember(project.id, project.modified) {
+                        store.thumbnail(project.id)?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() }
+                    }
+                    var itemMenu by remember(project.id) { mutableStateOf(false) }
+                    var exportMenu by remember(project.id) { mutableStateOf(false) }
+                    val selected = project.id in selectedIds
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(StudioColors.Panel)
+                            .clickable(enabled = !selectionMode) { onOpen(project) }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    ) {
+                        if (selectionMode) {
+                            Checkbox(checked = selected, onCheckedChange = { checked ->
+                                selectedIds = if (checked) selectedIds + project.id else selectedIds - project.id
+                            })
+                        }
+                        Box(
+                            Modifier.size(width = 88.dp, height = 68.dp).clip(RoundedCornerShape(10.dp))
+                                .background(Brush.linearGradient(listOf(StudioColors.CheckerA, StudioColors.CheckerB))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+                            else Icon(Ic.Shape, StudioColors.TextMuted, 29.dp)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(project.name, color = StudioColors.TextPrimary, fontSize = 13.sp, maxLines = 1, fontWeight = FontWeight.SemiBold)
+                            Text(dateFormat.format(Date(project.modified)), color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1)
+                            Text(tr("TGS Studio project", "پروژه TGS Studio"), color = StudioColors.Accent, fontSize = 9.sp)
+                        }
+                        Box {
+                            IconBtn(Ic.More, { itemMenu = true }, size = 34.dp, iconSize = 18.dp)
+                            DropdownMenu(expanded = itemMenu, onDismissRequest = { itemMenu = false }, containerColor = StudioColors.PanelRaised) {
+                                DropdownMenuItem(
+                                    text = { Text(tr("Select", "انتخاب"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Select, StudioColors.Accent, 18.dp) },
+                                    onClick = {
+                                        itemMenu = false
+                                        selectionMode = true
+                                        selectedIds = selectedIds + project.id
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Export", "خروجی گرفتن"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Export, StudioColors.Accent, 18.dp) },
+                                    onClick = { itemMenu = false; exportMenu = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Duplicate", "ایجاد کپی"), color = StudioColors.TextPrimary) },
+                                    leadingIcon = { Icon(Ic.Copy, StudioColors.TextPrimary, 18.dp) },
+                                    onClick = { itemMenu = false; onDuplicate(project) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(tr("Delete", "حذف"), color = Color(0xFFFF6B6B)) },
+                                    leadingIcon = { Icon(Ic.Trash, Color(0xFFFF6B6B), 18.dp) },
+                                    onClick = { itemMenu = false; onDelete(project) },
+                                )
+                            }
+                            DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }, containerColor = StudioColors.PanelRaised) {
+                                listOf(
+                                    "tgs" to tr("Telegram TGS", "خروجی TGS"),
+                                    "json" to tr("Lottie JSON", "خروجی Lottie JSON"),
+                                    "svg" to tr("SVG frame", "فریم SVG"),
+                                    "project" to tr("TGS Studio Project (.tgsproj)", "پروژه قابل ویرایش (.tgsproj)"),
+                                ).forEach { (format, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label, color = StudioColors.TextPrimary, fontSize = 12.sp) },
+                                        onClick = { exportMenu = false; onExport(project, format) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(StudioColors.Panel.copy(alpha = 0.98f))
+                .padding(horizontal = 9.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            BottomNavItem(Ic.Home, tr("Home", "خانه"), !projectsTab) { projectsTab = false; query = "" }
+            BottomNavItem(Ic.Layers, tr("Projects", "پروژه‌ها"), projectsTab) { projectsTab = true; query = "" }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Box {
+                    Box(
+                        Modifier.size(58.dp).clip(CircleShape).background(StudioColors.Accent)
+                            .clickable { menuOpen = true },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Ic.Plus, Color.White, 29.dp) }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = StudioColors.PanelRaised) {
+                        DropdownMenuItem(
+                            text = { Text(tr("New Project", "پروژه جدید"), color = StudioColors.TextPrimary) },
+                            leadingIcon = { Icon(Ic.Plus, StudioColors.Accent, 20.dp) },
+                            onClick = { menuOpen = false; onNew() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(tr("Open TGS", "باز کردن TGS"), color = StudioColors.TextPrimary) },
+                            leadingIcon = { Icon(Ic.Folder, StudioColors.Accent, 20.dp) },
+                            onClick = { menuOpen = false; onImport() },
+                        )
+                    }
+                }
+            }
+            BottomNavItem(Ic.Folder, tr("Import", "ورود"), false, onImport)
+            BottomNavItem(Ic.Settings, tr("Settings", "تنظیمات"), false, onSettings)
+        }
+    }
+
+    if (showBulkDelete) {
+        AlertDialog(
+            onDismissRequest = { showBulkDelete = false },
+            containerColor = StudioColors.Panel,
+            title = { Text(tr("Delete selected projects?", "پروژه‌های انتخاب‌شده حذف شوند؟"), color = StudioColors.TextPrimary) },
+            text = { Text(tr("This will permanently remove ${selectedIds.size} project(s) from this device.", "تعداد ${selectedIds.size} پروژه برای همیشه از این دستگاه حذف می‌شود."), color = StudioColors.TextMuted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteSelected(selectedProjects)
+                    selectedIds = emptySet()
+                    selectionMode = false
+                    showBulkDelete = false
+                }) { Text(tr("Delete", "حذف"), color = Color(0xFFFF6B6B)) }
+            },
+            dismissButton = { TextButton(onClick = { showBulkDelete = false }) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
+        )
+    }
+}
+
+@Composable
+private fun BottomNavItem(icon: Ic, title: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.width(66.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(icon, if (selected) StudioColors.Accent else StudioColors.TextMuted, 20.dp)
+        Text(title, color = if (selected) StudioColors.Accent else StudioColors.TextMuted, fontSize = 9.sp, maxLines = 1)
+    }
+}
+
 
 @Composable
 private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int, Double, String) -> Unit) {
@@ -174,7 +365,7 @@ private fun NewProjectDialog(onDismiss: () -> Unit, onCreate: (String, Int, Int,
         containerColor = StudioColors.Panel,
         title = { Text(tr("New composition", "کامپوزیشن جدید"), color = StudioColors.TextPrimary) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Column(androidx.compose.ui.Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 OutlinedTextField(name, { name = it }, singleLine = true, label = { Text(tr("Project name", "نام پروژه")) }, modifier = Modifier.fillMaxWidth())
                 Text(tr("Aspect ratio", "نسبت تصویر"), color = StudioColors.TextMuted, fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
