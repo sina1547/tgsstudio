@@ -397,11 +397,8 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
                 state.tool = tool
                 if (tool != Tool.PEN) state.penPath = null
                 state.changed()
-                // Close the tool drawer for shape tools so their contextual controls,
-                // including Rectangle corner radius, are immediately visible on the canvas.
-                if (tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
-                    close()
-                }
+                // Rectangle creation settings live in the Properties panel, not the tool drawer.
+                if (tool == Tool.RECT) state.updatePanel(PanelTab.PROPERTIES)
             }.padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -562,13 +559,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(tr("Sides: ${state.polygonSides}", "تعداد اضلاع: ${state.polygonSides}"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.polygonSides.toFloat(), 3f..20f, {}, { state.polygonSides = it.toInt().coerceIn(3, 20) }, {})
                 }
-                Tool.RECT -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text(tr("Corner radius (0 = square)", "گرد کردن گوشه‌ها (صفر = معمولی)"), color = StudioColors.TextMuted, fontSize = 11.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
-                        GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
-                    }
-                }
+                Tool.RECT -> Unit
                 Tool.ARC -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Text(tr("Arc angle: ${state.arcDegrees}°", "زاویه کمان: ${state.arcDegrees}°"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.arcDegrees.toFloat(), 30f..360f, {}, { state.arcDegrees = it.toInt().coerceIn(30, 360) }, {})
@@ -650,6 +641,7 @@ private fun QuickActionBar(state: EditorState, onText: () -> Unit, onMedia: () -
         QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
             state.tool = Tool.RECT
             state.toolsDrawerOpen = false
+            state.updatePanel(PanelTab.PROPERTIES)
             state.changed()
         }
         QuickAction(Ic.Effects, tr("Effects", "افکت"), state.panel == PanelTab.EFFECTS, Modifier.weight(1f)) {
