@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -60,6 +61,7 @@ fun PropertiesPanel(state: EditorState) {
             if (sel.size > 1) Text(tr("${sel.size} selected (editing the first)", "${sel.size} مورد انتخاب شده (ویرایش اولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
         }
         if (target == null) {
+            if (state.tool == Tool.RECT) key(tick) { ShapeSection(state, null) }
             Text(tr("Select an element on the canvas or in Layers.", "یک عنصر را روی بوم یا در لایه‌ها انتخاب کنید."), color = StudioColors.TextMuted, modifier = Modifier.padding(vertical = 16.dp))
             return@Column
         }
@@ -325,16 +327,27 @@ private fun AppearanceSection(state: EditorState, t: Target) {
 }
 
 @Composable
-private fun ShapeSection(state: EditorState, t: Target) {
-    val entries = state.session.animatedProps(t).filter { it.depth <= 1 && it.key in SHAPE_KEYS && it.kind != PropKind.COLOR && it.kind != PropKind.PATH }
-    if (entries.isEmpty()) return
+private fun ShapeSection(state: EditorState, t: Target?) {
+    val entries = t?.let { target ->
+        state.session.animatedProps(target).filter { it.depth <= 1 && it.key in SHAPE_KEYS && it.kind != PropKind.COLOR && it.kind != PropKind.PATH }
+    } ?: emptyList()
+    if (entries.isEmpty() && state.tool != Tool.RECT) return
     Section(tr("Shape", "شکل")) {
-        for (e in entries) {
-            val vals = state.session.valueAt(e) ?: continue
-            Labeled("${propLabel(e.key)}  ·  ${e.owner}") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    vals.forEachIndexed { i, d ->
-                        if (i < 2 || e.kind == PropKind.NUMBER) NumberField(d, { nv -> val copy = vals.copyOf(); copy[i] = nv; state.act { edit("Shape property") { PropWrite.setValues(e.prop, Spaces.localFrame(index, t.layer.scope, frame), copy) } } }, Modifier.weight(1f))
+        if (state.tool == Tool.RECT) {
+            Text(tr("Corner radius (0 = square)", "گردی گوشه‌ها (صفر = مستطیل معمولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
+                GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
+            }
+        }
+        if (t != null) {
+            for (e in entries) {
+                val vals = state.session.valueAt(e) ?: continue
+                Labeled("${propLabel(e.key)}  ·  ${e.owner}") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        vals.forEachIndexed { i, d ->
+                            if (i < 2 || e.kind == PropKind.NUMBER) NumberField(d, { nv -> val copy = vals.copyOf(); copy[i] = nv; state.act { edit("Shape property") { PropWrite.setValues(e.prop, Spaces.localFrame(index, t.layer.scope, frame), copy) } } }, Modifier.weight(1f))
+                        }
                     }
                 }
             }
