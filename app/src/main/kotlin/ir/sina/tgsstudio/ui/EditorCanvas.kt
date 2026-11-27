@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -168,7 +169,14 @@ private fun DrawScope.drawOverlay(state: EditorState, box: Box?, density: Float)
     }
     state.dragRect?.let { (a, b) ->
         val p0 = state.toScreen(a.x.toDouble(), a.y.toDouble()); val p1 = state.toScreen(b.x.toDouble(), b.y.toDouble())
-        drawRect(accent, Offset(minOf(p0.x, p1.x), minOf(p0.y, p1.y)), Size(kotlin.math.abs(p1.x - p0.x), kotlin.math.abs(p1.y - p0.y)), style = Stroke(1.5f * density))
+        val topLeft = Offset(minOf(p0.x, p1.x), minOf(p0.y, p1.y))
+        val shapeSize = Size(kotlin.math.abs(p1.x - p0.x), kotlin.math.abs(p1.y - p0.y))
+        val radius = (state.rectRoundness * state.viewScale).coerceIn(0f, minOf(shapeSize.width, shapeSize.height) / 2f)
+        if (state.tool == Tool.RECT && radius > 0f) {
+            drawRoundRect(accent, topLeft, shapeSize, CornerRadius(radius, radius), style = Stroke(1.5f * density))
+        } else {
+            drawRect(accent, topLeft, shapeSize, style = Stroke(1.5f * density))
+        }
     }
 }
 
@@ -344,7 +352,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
                     session.addFreeform(PathOps.setClosed(cur, true)); state.penPath = null; state.tool = Tool.SELECT; state.changed(); mode = Mode.NONE
                 } else { state.penPath = PathOps.append(cur, startDoc.x.toDouble(), startDoc.y.toDouble()); mode = Mode.PEN }
             }
-            Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
+            Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL -> { mode = Mode.SHAPE; state.dragRect = startDoc to startDoc }
             Tool.DRAW -> { mode = Mode.DRAW; state.drawPoints = listOf(startDoc) }
             Tool.ERASE -> {
                 mode = Mode.ERASE; session.beginGesture("Erase")
@@ -516,8 +524,7 @@ private fun finishShape(state: EditorState, tool: Tool, a: Offset, b: Offset) {
     state.act {
         when (tool) {
             Tool.LINE -> addFreeform(Bezier(false, doubleArrayOf(p0.x.toDouble(), p0.y.toDouble(), p1.x.toDouble(), p1.y.toDouble()), DoubleArray(4), DoubleArray(4)), filled = false)
-            Tool.RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
-            Tool.ROUNDED_RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0), roundness = state.rectRoundness.toDouble())
+            Tool.RECT -> addRect(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0), roundness = state.rectRoundness.toDouble())
             Tool.ELLIPSE -> addEllipse(cx, cy, w.coerceAtLeast(2.0), h.coerceAtLeast(2.0))
             Tool.STAR -> addStar(cx, cy, max(w, h) / 2, points = state.starPoints)
             Tool.POLYGON -> addPolygon(cx, cy, max(w, h) / 2, points = state.polygonSides)
