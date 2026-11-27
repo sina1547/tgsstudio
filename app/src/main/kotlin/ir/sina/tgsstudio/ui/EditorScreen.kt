@@ -310,7 +310,6 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
                     if ("shapes" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
@@ -464,7 +463,6 @@ private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
         Triple(Tool.CORNER_NODE, Ic.CornerNode, tr("Corner", "گوشه")),
         Triple(Tool.LINE, Ic.Line, tr("Line", "خط")),
         Triple(Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل")),
-        Triple(Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Round rect", "مستطیل گرد")),
         Triple(Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی")),
         Triple(Tool.STAR, Ic.Star, tr("Star", "ستاره")),
         Triple(Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی")),
@@ -536,7 +534,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 SmallButton(tr("Fit canvas", "برازش بوم"), { state.fit(state.fitSize.x, state.fitSize.y) }, ic = Ic.Fit)
             }
         }
-        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
+        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
@@ -551,8 +549,8 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(tr("Sides: ${state.polygonSides}", "تعداد اضلاع: ${state.polygonSides}"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.polygonSides.toFloat(), 3f..20f, {}, { state.polygonSides = it.toInt().coerceIn(3, 20) }, {})
                 }
-                Tool.ROUNDED_RECT -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text(tr("Corner radius", "شعاع گوشه‌ها"), color = StudioColors.TextMuted, fontSize = 11.sp)
+                Tool.RECT -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text(tr("Corner radius (0 = square)", "گرد کردن گوشه‌ها (صفر = معمولی)"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
                         GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
@@ -636,7 +634,7 @@ private fun QuickActionBar(state: EditorState, onText: () -> Unit, onMedia: () -
             state.toolsDrawerOpen = !state.toolsDrawerOpen
         }
         QuickAction(Ic.Text, tr("Text", "متن"), false, Modifier.weight(1f), onText)
-        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
+        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
             state.tool = Tool.RECT
             state.toolsDrawerOpen = false
             state.changed()
