@@ -397,7 +397,11 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
                 state.tool = tool
                 if (tool != Tool.PEN) state.penPath = null
                 state.changed()
-                // Keep the right dock open so the selected tool's settings remain available.
+                // Close the tool drawer for shape tools so their contextual controls,
+                // including Rectangle corner radius, are immediately visible on the canvas.
+                if (tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
+                    close()
+                }
             }.padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
