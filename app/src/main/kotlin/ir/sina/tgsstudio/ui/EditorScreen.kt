@@ -357,6 +357,15 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
             }
         }
 
+        // Keep shape controls visible after the tool drawer closes.
+        if (!toolsOpen && state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(start = 76.dp, end = 8.dp, bottom = 8.dp)
+            ) {
+                ContextBars(state, Modifier.fillMaxWidth())
+            }
+        }
 
     }
 }
