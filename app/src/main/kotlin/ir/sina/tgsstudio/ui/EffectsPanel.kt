@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,6 +84,7 @@ private fun effectCategories() = listOf(
     EffectCategoryUi("repeat", "Procedural / Repeat", "رویه‌ای و تکرار", listOf(EffectKind.PULSE, EffectKind.FLOAT)),
 )
 
+@Composable
 private fun effectCategoryLabel(c: EffectCategoryUi) = tr(c.en, c.fa)
 
 private fun noteText(state: EditorState, r: EffectResult): String? {
