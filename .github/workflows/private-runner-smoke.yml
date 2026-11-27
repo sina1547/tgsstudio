@@ -1,0 +1,30 @@
+name: Private Runner Smoke Test
+
+on:
+  push:
+    branches:
+      - diagnostic/private-runner-smoke-20261127
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke-test:
+    name: Verify private-repository runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm runner started
+        run: |
+          echo "PRIVATE_REPO_RUNNER_STARTED=YES"
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "RUNNER_ARCH=$RUNNER_ARCH"
+          echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+      - name: Verify shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_OS" = "Linux"
+          echo "PRIVATE_REPO_SHELL_TEST=PASS"
+      - name: Finish
+        run: echo "PRIVATE_REPO_RUNNER_TEST=SUCCESS"
