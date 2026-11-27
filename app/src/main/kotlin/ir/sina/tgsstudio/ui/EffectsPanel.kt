@@ -85,6 +85,7 @@ private fun effectCategories() = listOf(
 )
 
 @Composable
+@Composable
 private fun effectCategoryLabel(c: EffectCategoryUi) = tr(c.en, c.fa)
 
 private fun noteText(state: EditorState, r: EffectResult): String? {
@@ -282,7 +283,7 @@ fun EffectsPanel(state: EditorState) {
                     val category = effectCategories().firstOrNull { it.id == categoryId }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconBtn(Ic.Back, { browseMode = "categories" }, size = 36.dp, iconSize = 18.dp)
-                        Text(category?.let(::effectCategoryLabel) ?: tr("Effects", "افکت‌ها"), color = StudioColors.TextPrimary, fontSize = 14.sp)
+                        Text(if (category != null) effectCategoryLabel(category) else tr("Effects", "افکت‌ها"), color = StudioColors.TextPrimary, fontSize = 14.sp)
                     }
                 }
                 val visibleKinds = when (browseMode) {
