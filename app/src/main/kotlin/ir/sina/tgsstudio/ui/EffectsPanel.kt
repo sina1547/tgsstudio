@@ -85,7 +85,6 @@ private fun effectCategories() = listOf(
 )
 
 @Composable
-@Composable
 private fun effectCategoryLabel(c: EffectCategoryUi) = tr(c.en, c.fa)
 
 private fun noteText(state: EditorState, r: EffectResult): String? {
