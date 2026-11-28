@@ -248,7 +248,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             if (orderedStops.size >= 2) {
                 Box(
                     Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(8.dp))
-                        .background(Brush.horizontalGradient(orderedStops.map { it.color.toColor() })),
+                        .background(Brush.horizontalGradient(colorStops = orderedStops.map { it.position.toFloat() to it.color.toColor() }.toTypedArray())),
                 )
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -270,9 +270,11 @@ private fun AppearanceSection(state: EditorState, t: Target) {
                     }, size = 32.dp, iconSize = 16.dp)
                 }
             }
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(gradient.startX, { state.act { setGradient(t, gradient.copy(startX = it)) } }, Modifier.weight(1f), label = "X1")
                 NumberField(gradient.startY, { state.act { setGradient(t, gradient.copy(startY = it)) } }, Modifier.weight(1f), label = "Y1")
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(gradient.endX, { state.act { setGradient(t, gradient.copy(endX = it)) } }, Modifier.weight(1f), label = "X2")
                 NumberField(gradient.endY, { state.act { setGradient(t, gradient.copy(endY = it)) } }, Modifier.weight(1f), label = "Y2")
             }
