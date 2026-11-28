@@ -409,6 +409,8 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
                 state.tool = tool
                 if (tool != Tool.PEN) state.penPath = null
                 state.changed()
+                // Close the drawer after every tool selection; the selected tool remains active.
+                close()
                 // Rectangle creation settings live in the Properties panel, not the tool drawer.
                 if (tool == Tool.RECT) state.updatePanel(PanelTab.PROPERTIES)
             }.padding(horizontal = 7.dp, vertical = 7.dp),
