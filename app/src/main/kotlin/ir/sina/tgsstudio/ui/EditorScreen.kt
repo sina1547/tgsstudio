@@ -194,7 +194,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         // Alight Motion-inspired workspace: a single preview surface above a continuous timeline dock.
         // The dock gets a stable, larger share of the portrait viewport so layer clips remain usable.
-        val workspacePanelHeight = (maxHeight * 0.48f).coerceIn(300.dp, 440.dp)
+        val workspacePanelHeight = state.panelHeightDp.dp.coerceIn(300.dp, 440.dp)
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -440,7 +440,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
                 if (state.dirty) Dot(StudioColors.Warning, 7.dp)
             }
             Text(
-                "TGS  ·  ${state.session.doc.width} × ${state.session.doc.height}  ·  ${fmt(state.session.doc.frameRate, 0)} FPS",
+                "${state.session.doc.width} × ${state.session.doc.height}  ·  ${fmt(state.session.doc.frameRate, 0)} FPS",
                 color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1,
             )
         }
