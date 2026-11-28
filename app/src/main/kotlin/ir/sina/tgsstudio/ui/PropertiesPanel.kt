@@ -60,7 +60,7 @@ fun PropertiesPanel(state: EditorState) {
             if (sel.size > 1) Text(tr("${sel.size} selected (editing the first)", "${sel.size} مورد انتخاب شده (ویرایش اولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
         }
         if (target == null) {
-            if (state.tool == Tool.RECT) key(tick) { ShapeSection(state, null) }
+            if (state.tool == Tool.RECT) ShapeSection(state, null)
             Text(tr("Select an element on the canvas or in Layers.", "یک عنصر را روی بوم یا در لایه‌ها انتخاب کنید."), color = StudioColors.TextMuted, modifier = Modifier.padding(vertical = 16.dp))
             return@Column
         }
