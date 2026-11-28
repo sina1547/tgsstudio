@@ -354,8 +354,9 @@ private fun ShapeSection(state: EditorState, t: Target?) {
         if (t != null && rectangleRadius != null) {
             val radius = (state.session.valueAt(rectangleRadius)?.firstOrNull() ?: 0.0).coerceIn(0.0, 120.0)
             Labeled(tr("Corner radius", "گردی گوشه‌ها")) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(radius, { value ->
+                StepperField(
+                    radius,
+                    { value ->
                         val next = value.coerceIn(0.0, 120.0)
                         state.act {
                             edit("Rectangle corner radius") {
@@ -366,22 +367,14 @@ private fun ShapeSection(state: EditorState, t: Target?) {
                                 )
                             }
                         }
-                    }, Modifier.width(76.dp), decimals = 0, suffix = "px")
-                    GestureSlider(
-                        radius.toFloat(), 0f..120f,
-                        { state.session.beginGesture("Rectangle corner radius") },
-                        { value ->
-                            PropWrite.setValues(
-                                rectangleRadius.prop,
-                                Spaces.localFrame(state.session.index, t.layer.scope, state.frame),
-                                doubleArrayOf(value.coerceIn(0f, 120f).toDouble()),
-                            )
-                            state.changed()
-                        },
-                        { state.session.endGesture(); state.changed() },
-                        Modifier.weight(1f),
-                    )
-                }
+                    },
+                    Modifier.fillMaxWidth(),
+                    decimals = 0,
+                    suffix = "px",
+                    step = 1.0,
+                    min = 0.0,
+                    max = 120.0,
+                )
             }
         }
 
@@ -483,7 +476,7 @@ private fun TrimSection(state: EditorState, t: Target) {
             val v = session.valueAt(e)?.firstOrNull() ?: 0.0
             val here = KeyframeOps.times(e.prop).indexOfFirst { kotlin.math.abs(it - lf) < 0.5 }
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(propLabel(e.key), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.weight(0.9f))
+                Text(when (e.key) { "start" -> tr("Trim start %", "شروع برش ٪"); "end" -> tr("Trim end %", "پایان برش ٪"); else -> tr("Trim offset °", "جابه‌جایی برش °") }, color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.weight(0.9f))
                 NumberField(v, { nv -> state.act { edit("Trim") { PropWrite.setValues(e.prop, lf, doubleArrayOf(nv)) } } }, Modifier.weight(1f), suffix = if (e.key == "offset") "°" else "%")
                 IconBtn(Ic.Key, { state.act { if (here >= 0) removeKeyframe(e, here) else addKeyframe(e, t.layer.scope) } }, size = 38.dp, iconSize = 18.dp, active = here >= 0)
             }
