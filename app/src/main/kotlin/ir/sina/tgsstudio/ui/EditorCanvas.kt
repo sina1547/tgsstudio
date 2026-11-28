@@ -393,7 +393,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.canvasGe
             }
 
             when (mode) {
-                Mode.PAN -> Unit // Keep the document canvas anchored; empty-space drags do not move the canvas.
+                Mode.PAN -> { state.viewOffset = state.viewOffset + d } // Hand tool pans the viewport without changing document coordinates.
                 Mode.MOVE -> {
                     val dx = if (state.snapToGrid) {
                         val step = state.gridSpacing.coerceAtLeast(5f)
