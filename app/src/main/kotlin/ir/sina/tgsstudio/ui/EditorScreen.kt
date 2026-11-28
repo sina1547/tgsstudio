@@ -87,6 +87,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     var showText by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
+    var showCanvasSize by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var pendingKind by remember { mutableStateOf<ExportKind?>(null) }
 
@@ -196,7 +197,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
         // The dock gets a stable, larger share of the portrait viewport so layer clips remain usable.
         val workspacePanelHeight = remember(maxWidth) { (maxHeight * 0.48f).coerceIn(300.dp, 440.dp) }
         Column(Modifier.fillMaxSize()) {
-            if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
+            if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }, { showCanvasSize = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 CanvasArea(state, { showText = true }, { svgPicker.launch(arrayOf("*/*")) })
 
@@ -226,6 +227,17 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     }
 
     if (showExport) ExportDialog(doc, { kind -> showExport = false; launchExport(kind) }, { showExport = false })
+    if (showCanvasSize) CanvasSizeDialog(
+        doc.width,
+        doc.height,
+        onApply = { width, height ->
+            state.act { setCanvasSize(width, height) }
+            state.viewFitted = false
+            state.fit(state.fitSize.x, state.fitSize.y)
+            showCanvasSize = false
+        },
+        onDismiss = { showCanvasSize = false },
+    )
     if (showText) TextDialog(state, { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/octet-stream")) }) { showText = false }
     if (showRename) NameDialog(tr("Project name", "نام پروژه"), state.projectName, { n -> state.projectName = n; store.rename(state.projectId, n); doc.name = n; showRename = false; state.changed() }, { showRename = false })
     if (showLeave) ConfirmDialog(
@@ -424,7 +436,7 @@ private fun ToolDrawerAction(icon: Ic, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit) {
+private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, onExport: () -> Unit, onMore: () -> Unit, menuOpen: Boolean, onMenuClose: () -> Unit, onPreview: () -> Unit, onRename: () -> Unit, onCanvasSize: () -> Unit) {
     val tick = state.tick
     Row(
         Modifier.fillMaxWidth().height(48.dp).background(StudioColors.Panel).padding(horizontal = 6.dp),
@@ -455,6 +467,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
                 DropdownMenuItem(text = { Text(tr("Preview", "پیش‌نمایش"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); onPreview() })
                 DropdownMenuItem(text = { Text(tr("Rename project", "تغییر نام پروژه"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); onRename() })
                 DropdownMenuItem(text = { Text(tr("Fit to screen", "جای‌دهی در صفحه"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); state.fit(state.fitSize.x, state.fitSize.y) })
+                DropdownMenuItem(text = { Text(tr("Canvas size…", "اندازه بوم…"), color = StudioColors.TextPrimary) }, onClick = { onMenuClose(); onCanvasSize() })
             }
         }
     }
