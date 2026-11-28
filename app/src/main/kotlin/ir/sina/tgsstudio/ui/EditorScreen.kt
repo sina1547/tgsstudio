@@ -194,7 +194,7 @@ fun EditorScreen(state: EditorState, store: ProjectStore, lang: Lang, onExit: ()
     BoxWithConstraints(Modifier.fillMaxSize().background(StudioColors.Background)) {
         // Alight Motion-inspired workspace: a single preview surface above a continuous timeline dock.
         // The dock gets a stable, larger share of the portrait viewport so layer clips remain usable.
-        val workspacePanelHeight = (maxHeight * 0.48f).coerceIn(300.dp, 440.dp)
+        val workspacePanelHeight = remember(maxWidth) { (maxHeight * 0.48f).coerceIn(300.dp, 440.dp) }
         Column(Modifier.fillMaxSize()) {
             if (!state.previewMode) Ltr { TopBar(state, { if (state.dirty) showLeave = true else onExit() }, ::save, { showExport = true }, { menu = true }, menu, { menu = false }, { state.previewMode = true }, { showRename = true }) }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -310,7 +310,6 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
                     ToolGroupHeader(tr("Geometric shapes", "اشکال هندسی"), "shapes" in expandedToolGroups) { toggleToolGroup("shapes") }
                     if ("shapes" in expandedToolGroups) {
                         ToolDrawerItem(state, Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل"), { state.toolsDrawerOpen = false })
-                        ToolDrawerItem(state, Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Rounded Rectangle", "مستطیل گوشه‌گرد"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.STAR, Ic.Star, tr("Star", "ستاره"), { state.toolsDrawerOpen = false })
                         ToolDrawerItem(state, Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی"), { state.toolsDrawerOpen = false })
@@ -358,6 +357,15 @@ private fun CanvasArea(state: EditorState, onText: () -> Unit, onSvg: () -> Unit
             }
         }
 
+        // Keep shape controls visible after the tool drawer closes.
+        if (!toolsOpen && state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(start = 76.dp, end = 8.dp, bottom = 8.dp)
+            ) {
+                ContextBars(state, Modifier.fillMaxWidth())
+            }
+        }
 
     }
 }
@@ -389,7 +397,8 @@ private fun ToolDrawerItem(state: EditorState, tool: Tool, icon: Ic, label: Stri
                 state.tool = tool
                 if (tool != Tool.PEN) state.penPath = null
                 state.changed()
-                // Keep the right dock open so the selected tool's settings remain available.
+                // Rectangle creation settings live in the Properties panel, not the tool drawer.
+                if (tool == Tool.RECT) state.updatePanel(PanelTab.PROPERTIES)
             }.padding(horizontal = 7.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -431,7 +440,7 @@ private fun TopBar(state: EditorState, onBack: () -> Unit, onSave: () -> Unit, o
                 if (state.dirty) Dot(StudioColors.Warning, 7.dp)
             }
             Text(
-                "TGS  ·  ${state.session.doc.width} × ${state.session.doc.height}  ·  ${fmt(state.session.doc.frameRate, 0)} FPS",
+                "${state.session.doc.width} × ${state.session.doc.height}  ·  ${fmt(state.session.doc.frameRate, 0)} FPS",
                 color = StudioColors.TextMuted, fontSize = 10.sp, maxLines = 1,
             )
         }
@@ -464,7 +473,6 @@ private fun ToolBar(state: EditorState, onText: () -> Unit, onSvg: () -> Unit) {
         Triple(Tool.CORNER_NODE, Ic.CornerNode, tr("Corner", "گوشه")),
         Triple(Tool.LINE, Ic.Line, tr("Line", "خط")),
         Triple(Tool.RECT, Ic.Rect, tr("Rectangle", "مستطیل")),
-        Triple(Tool.ROUNDED_RECT, Ic.RoundedRect, tr("Round rect", "مستطیل گرد")),
         Triple(Tool.ELLIPSE, Ic.Ellipse, tr("Ellipse", "بیضی")),
         Triple(Tool.STAR, Ic.Star, tr("Star", "ستاره")),
         Triple(Tool.POLYGON, Ic.Polygon, tr("Polygon", "چندضلعی")),
@@ -536,7 +544,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                 SmallButton(tr("Fit canvas", "برازش بوم"), { state.fit(state.fitSize.x, state.fitSize.y) }, ic = Ic.Fit)
             }
         }
-        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
+        if (state.tool in setOf(Tool.LINE, Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON, Tool.ARC, Tool.SPIRAL)) {
             Row(Modifier.clip(RoundedCornerShape(14.dp)).background(StudioColors.PanelRaised).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Shape options", "تنظیمات شکل"), color = StudioColors.TextMuted, fontSize = 11.sp)
                 SmallButton(tr("Constrain", "تناسب ثابت"), { state.constrainShape = !state.constrainShape }, primary = state.constrainShape)
@@ -551,10 +559,7 @@ private fun ContextBars(state: EditorState, modifier: Modifier) {
                     Text(tr("Sides: ${state.polygonSides}", "تعداد اضلاع: ${state.polygonSides}"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.polygonSides.toFloat(), 3f..20f, {}, { state.polygonSides = it.toInt().coerceIn(3, 20) }, {})
                 }
-                Tool.ROUNDED_RECT -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text(tr("Corner radius: ${fmt(state.rectRoundness.toDouble(), 0)} px", "شعاع گوشه: ${fmt(state.rectRoundness.toDouble(), 0)} پیکسل"), color = StudioColors.TextMuted, fontSize = 11.sp)
-                    GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {})
-                }
+                Tool.RECT -> Unit
                 Tool.ARC -> Column(Modifier.clip(RoundedCornerShape(12.dp)).background(StudioColors.PanelRaised).padding(horizontal = 12.dp, vertical = 6.dp)) {
                     Text(tr("Arc angle: ${state.arcDegrees}°", "زاویه کمان: ${state.arcDegrees}°"), color = StudioColors.TextMuted, fontSize = 11.sp)
                     GestureSlider(state.arcDegrees.toFloat(), 30f..360f, {}, { state.arcDegrees = it.toInt().coerceIn(30, 360) }, {})
@@ -633,9 +638,10 @@ private fun QuickActionBar(state: EditorState, onText: () -> Unit, onMedia: () -
             state.toolsDrawerOpen = !state.toolsDrawerOpen
         }
         QuickAction(Ic.Text, tr("Text", "متن"), false, Modifier.weight(1f), onText)
-        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ROUNDED_RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
+        QuickAction(Ic.Rect, tr("Shape", "شکل"), state.tool in setOf(Tool.RECT, Tool.ELLIPSE, Tool.STAR, Tool.POLYGON), Modifier.weight(1f)) {
             state.tool = Tool.RECT
             state.toolsDrawerOpen = false
+            state.updatePanel(PanelTab.PROPERTIES)
             state.changed()
         }
         QuickAction(Ic.Effects, tr("Effects", "افکت"), state.panel == PanelTab.EFFECTS, Modifier.weight(1f)) {

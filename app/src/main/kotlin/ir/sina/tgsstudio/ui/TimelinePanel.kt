@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,73 +149,8 @@ fun TimelinePanel(state: EditorState) {
                 }
                 .focusable()
         ) {
-            // Contextual timeline tools only. Frame stepping and frame readout live in PlaybackBar.
             val sk = state.selectedKey
             val selEntry = sk?.let { rows.getOrNull(it.first) }
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                val selectedLayer = target as? LayerTarget
-                IconBtn(Ic.Split, {
-                    selectedLayer?.let { layer ->
-                        val result = state.act { splitLayer(layer.layer, state.frame) }
-                        if (result == null) state.message = splitHint
-                    }
-                }, enabled = selectedLayer != null, size = 34.dp, iconSize = 18.dp, tint = StudioColors.Accent)
-                val activeRow = state.selectedKey?.first?.takeIf { it in rows.indices } ?: rows.indices.firstOrNull()
-                IconBtn(Ic.Add, {
-                    val ri = activeRow
-                    if (ri != null) {
-                        val entry = rows[ri]
-                        state.act { addKeyframe(entry, scope) }
-                        val localFrame = Spaces.localFrame(state.session.index, scope, state.frame)
-                        val ki = KeyframeOps.times(entry.prop).indexOfFirst { abs(it - localFrame) < 0.5 }
-                        if (ki >= 0) state.selectedKey = ri to ki
-                        state.changed()
-                    }
-                }, enabled = activeRow != null, size = 34.dp, iconSize = 18.dp, tint = StudioColors.Accent)
-                IconBtn(Ic.Minus, { state.timelinePxPerFrame = (state.timelinePxPerFrame / 1.4f).coerceAtLeast(1.5f) }, size = 34.dp, iconSize = 18.dp)
-                IconBtn(Ic.Plus, { state.timelinePxPerFrame = (state.timelinePxPerFrame * 1.4f).coerceAtMost(40f) }, size = 34.dp, iconSize = 18.dp)
-                IconBtn(Ic.Fit, { state.timelinePxPerFrame = 6f; state.selectedKey = null }, size = 34.dp, iconSize = 18.dp)
-                SmallButton(if (state.multiKeyframeMode) "Multi ✓" else "Multi", {
-                    state.multiKeyframeMode = !state.multiKeyframeMode
-                    if (!state.multiKeyframeMode) state.selectedKeys = state.selectedKey?.let { setOf(it) } ?: emptySet()
-                    state.changed()
-                }, primary = state.multiKeyframeMode)
-                IconBtn(Ic.Trash, {
-                    val grouped = state.selectedKeys.groupBy({ it.first }, { it.second })
-                    if (grouped.isNotEmpty()) {
-                        state.session.beginGesture("Delete selected keyframes")
-                        grouped.forEach { (row, indices) -> rows.getOrNull(row)?.let { state.session.removeKeyframes(it, indices) } }
-                        state.session.endGesture()
-                        state.selectedKeys = emptySet()
-                        state.selectedKey = null
-                        state.changed()
-                    }
-                }, enabled = state.selectedKeys.isNotEmpty(), size = 34.dp, iconSize = 18.dp, tint = StudioColors.Danger)
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                NumberField(doc.inPoint, {
-                    val end = doc.outPoint
-                    state.act { setWorkArea(it, end) }
-                    state.seek(state.frame)
-                }, modifier = Modifier.width(88.dp), decimals = 0, label = "In")
-                NumberField(doc.outPoint, {
-                    val start = doc.inPoint
-                    state.act { setWorkArea(start, it) }
-                    state.seek(state.frame)
-                }, modifier = Modifier.width(88.dp), decimals = 0, label = "Out")
-                NumberField(doc.frameRate, {
-                    state.act { setFrameRate(it) }
-                }, modifier = Modifier.width(88.dp), decimals = 1, label = "FPS")
-                Text(tr("Work area", "محدودهٔ کار"), color = StudioColors.TextMuted, fontSize = 11.sp)
-            }
             LayerTracks(state, contentWidthDp, hScroll)
 
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
@@ -300,7 +237,25 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                     }
                 }
             }
-            Box(Modifier.weight(1f).horizontalScroll(scroll)) {
+            Box(
+                Modifier.weight(1f).horizontalScroll(scroll).pointerInput(state) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val pressed = event.changes.count { it.pressed }
+                            if (pressed >= 2) {
+                                val zoom = event.calculateZoom()
+                                if (zoom.isFinite() && zoom != 1f) {
+                                    state.timelinePxPerFrame = (state.timelinePxPerFrame * zoom).coerceIn(1.5f, 40f)
+                                }
+                                event.changes.forEach { it.consume() }
+                            }
+                            if (pressed == 0) break
+                        }
+                    }
+                }
+            ) {
                 Canvas(
                     Modifier.width(widthDp).height((28 + 42 * layers.size).dp).background(StudioColors.Panel)
                         .pointerInput(ppf) {
@@ -311,6 +266,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                     state.seek(Math.rint(doc.inPoint + down.position.x / ppf))
                                     while (true) {
                                         val event = awaitPointerEvent()
+                                        if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                         val change = event.changes.first()
                                         if (change.changedToUp()) { change.consume(); break }
                                         state.seek(Math.rint(doc.inPoint + change.position.x / ppf))
@@ -332,6 +288,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                             var changed = false
                                             while (true) {
                                                 val event = awaitPointerEvent()
+                                                if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                                 val change = event.changes.first()
                                                 if (change.changedToUp()) { change.consume(); break }
                                                 val deltaFrames = (change.position.x - down.position.x) / ppf
@@ -357,6 +314,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                                 var changedClip = false
                                                 while (true) {
                                                     val event = awaitPointerEvent()
+                                                    if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                                     val change = event.changes.first()
                                                     if (change.changedToUp()) { change.consume(); break }
                                                     val rawDelta = Math.rint(((change.position.x - down.position.x) / ppf).toDouble())

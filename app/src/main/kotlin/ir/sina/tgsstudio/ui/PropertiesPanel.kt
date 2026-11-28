@@ -6,13 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -60,46 +60,21 @@ fun PropertiesPanel(state: EditorState) {
             if (sel.size > 1) Text(tr("${sel.size} selected (editing the first)", "${sel.size} مورد انتخاب شده (ویرایش اولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
         }
         if (target == null) {
+            if (state.tool == Tool.RECT) ShapeSection(state, null)
             Text(tr("Select an element on the canvas or in Layers.", "یک عنصر را روی بوم یا در لایه‌ها انتخاب کنید."), color = StudioColors.TextMuted, modifier = Modifier.padding(vertical = 16.dp))
             return@Column
         }
-        key(tick) { TransformSection(state, target) }
-        key(tick) { AlignmentSection(state, sel.size) }
+        TransformSection(state, target)
         if (target is LayerTarget) {
-            key(tick) { LayerTimingSection(state, target) }
-            key(tick) { MaskSection(state, target) }
+            LayerTimingSection(state, target)
+            MaskSection(state, target)
         }
-        key(tick) { AppearanceSection(state, target) }
-        key(tick) { ShapeSection(state, target) }
-        key(tick) { TrimSection(state, target) }
-        key(tick) { PathSection(state, target) }
-        key(tick) { AnimationSection(state, target) }
-        key(tick) { EffectsSection(state, target) }
-        key(tick) { AdvancedSection(state, target) }
-    }
-}
-
-@Composable
-private fun AlignmentSection(state: EditorState, selectionCount: Int) {
-    Section(tr("Alignment", "تراز و چیدمان"), defaultOpen = false) {
-        Text(tr("Align selected objects to the composition bounds.", "تراز اشیای انتخاب‌شده نسبت به محدودهٔ کامپوزیشن."), color = StudioColors.TextMuted, fontSize = 11.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallButton(tr("Left", "چپ"), { state.act { alignSelection(horizontal = "left") } }, enabled = selectionCount > 0)
-            SmallButton(tr("Center X", "وسط افقی"), { state.act { alignSelection(horizontal = "center") } }, enabled = selectionCount > 0)
-            SmallButton(tr("Right", "راست"), { state.act { alignSelection(horizontal = "right") } }, enabled = selectionCount > 0)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallButton(tr("Top", "بالا"), { state.act { alignSelection(vertical = "top") } }, enabled = selectionCount > 0)
-            SmallButton(tr("Center Y", "وسط عمودی"), { state.act { alignSelection(vertical = "middle") } }, enabled = selectionCount > 0)
-            SmallButton(tr("Bottom", "پایین"), { state.act { alignSelection(vertical = "bottom") } }, enabled = selectionCount > 0)
-        }
-        if (selectionCount >= 3) {
-            Text(tr("Equal spacing between selected objects.", "فاصله‌گذاری مساوی بین اشیای انتخاب‌شده."), color = StudioColors.TextMuted, fontSize = 11.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SmallButton(tr("Distribute X", "توزیع افقی"), { state.act { distributeSelectionHorizontally() } })
-                SmallButton(tr("Distribute Y", "توزیع عمودی"), { state.act { distributeSelectionVertically() } })
-            }
-        }
+        AppearanceSection(state, target)
+        ShapeSection(state, target)
+        TrimSection(state, target)
+        PathSection(state, target)
+        AnimationSection(state, target)
+        EffectsSection(state, target)
     }
 }
 
@@ -326,16 +301,76 @@ private fun AppearanceSection(state: EditorState, t: Target) {
 }
 
 @Composable
-private fun ShapeSection(state: EditorState, t: Target) {
-    val entries = state.session.animatedProps(t).filter { it.depth <= 1 && it.key in SHAPE_KEYS && it.kind != PropKind.COLOR && it.kind != PropKind.PATH }
-    if (entries.isEmpty()) return
+private fun ShapeSection(state: EditorState, t: Target?) {
+    val entries = t?.let { target ->
+        state.session.animatedProps(target).filter {
+            it.depth <= 3 && it.key in SHAPE_KEYS && it.kind != PropKind.COLOR && it.kind != PropKind.PATH
+        }
+    } ?: emptyList()
+    if (entries.isEmpty() && state.tool != Tool.RECT) return
+    val rectangleRadius = entries.firstOrNull {
+        it.key == "r" && it.owner.contains("rect", ignoreCase = true)
+    }
     Section(tr("Shape", "شکل")) {
-        for (e in entries) {
-            val vals = state.session.valueAt(e) ?: continue
-            Labeled("${propLabel(e.key)}  ·  ${e.owner}") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    vals.forEachIndexed { i, d ->
-                        if (i < 2 || e.kind == PropKind.NUMBER) NumberField(d, { nv -> val copy = vals.copyOf(); copy[i] = nv; state.act { edit("Shape property") { PropWrite.setValues(e.prop, Spaces.localFrame(index, t.layer.scope, frame), copy) } } }, Modifier.weight(1f))
+        // Creation default: available before drawing a rectangle.
+        if (state.tool == Tool.RECT) {
+            Text(tr("Corner radius (0 = square)", "گردی گوشه‌ها (صفر = مستطیل معمولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
+                GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
+            }
+        }
+
+        // Selected rectangle: edit the actual Rectangle Path roundness property after creation.
+        if (t != null && rectangleRadius != null) {
+            val radius = (state.session.valueAt(rectangleRadius)?.firstOrNull() ?: 0.0).coerceIn(0.0, 120.0)
+            Labeled(tr("Corner radius", "گردی گوشه‌ها")) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(radius, { value ->
+                        val next = value.coerceIn(0.0, 120.0)
+                        state.act {
+                            edit("Rectangle corner radius") {
+                                PropWrite.setValues(
+                                    rectangleRadius.prop,
+                                    Spaces.localFrame(index, t.layer.scope, frame),
+                                    doubleArrayOf(next),
+                                )
+                            }
+                        }
+                    }, Modifier.width(76.dp), decimals = 0, suffix = "px")
+                    GestureSlider(
+                        radius.toFloat(), 0f..120f,
+                        { state.session.beginGesture("Rectangle corner radius") },
+                        { value ->
+                            PropWrite.setValues(
+                                rectangleRadius.prop,
+                                Spaces.localFrame(state.session.index, t.layer.scope, state.frame),
+                                doubleArrayOf(value.coerceIn(0f, 120f).toDouble()),
+                            )
+                            state.changed()
+                        },
+                        { state.session.endGesture(); state.changed() },
+                        Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
+        if (t != null) {
+            for (e in entries.filterNot { it === rectangleRadius }) {
+                val vals = state.session.valueAt(e) ?: continue
+                Labeled("${propLabel(e.key)}  ·  ${e.owner}") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        vals.forEachIndexed { i, d ->
+                            if (i < 2 || e.kind == PropKind.NUMBER) NumberField(d, { nv ->
+                                val copy = vals.copyOf(); copy[i] = nv
+                                state.act {
+                                    edit("Shape property") {
+                                        PropWrite.setValues(e.prop, Spaces.localFrame(index, t.layer.scope, frame), copy)
+                                    }
+                                }
+                            }, Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -398,23 +433,6 @@ private fun AnimationSection(state: EditorState, t: Target) {
                     }
                 }, size = 38.dp, iconSize = 18.dp, active = hasHere)
             }
-        }
-    }
-}
-
-@Composable
-private fun AdvancedSection(state: EditorState, t: Target) {
-    val doc = state.session.doc
-    Section(tr("Advanced", "پیشرفته"), defaultOpen = false) {
-        Text(tr("Canvas ${doc.width}×${doc.height} · ${fmt(doc.frameRate, 0)} fps · ${fmt(doc.durationSeconds, 2)} s", "بوم ${doc.width}×${doc.height} · ${fmt(doc.frameRate, 0)} فریم/ثانیه · ${fmt(doc.durationSeconds, 2)} ثانیه"), color = StudioColors.TextMuted, fontSize = 13.sp)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallButton("30 fps", { state.act { setFrameRate(30.0) } }, primary = doc.frameRate == 30.0)
-            SmallButton("60 fps", { state.act { setFrameRate(60.0) } }, primary = doc.frameRate == 60.0)
-        }
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("Hidden", "پنهان"), color = StudioColors.TextPrimary, modifier = Modifier.weight(1f))
-            val hidden = (t as? LayerTarget)?.let { state.session.index.layer(it.layer)?.hidden } ?: (t as? ShapeTarget)?.let { state.session.index.shape(it.ref)?.hidden } ?: false
-            Switch(hidden, { state.act { setHidden(t, it) } }, colors = SwitchDefaults.colors(checkedTrackColor = StudioColors.Accent))
         }
     }
 }
