@@ -148,6 +148,8 @@ fun TimelinePanel(state: EditorState) {
                 }
                 .focusable()
         ) {
+            val sk = state.selectedKey
+            val selEntry = sk?.let { rows.getOrNull(it.first) }
             LayerTracks(state, contentWidthDp, hScroll)
 
             if (selEntry != null && sk != null) KeyframeBar(state, selEntry, sk.second)
