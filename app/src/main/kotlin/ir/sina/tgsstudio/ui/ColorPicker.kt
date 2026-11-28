@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -62,13 +64,18 @@ fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit,
     var green by remember { mutableIntStateOf((initialColor.green * 255).toInt()) }
     var blue by remember { mutableIntStateOf((initialColor.blue * 255).toInt()) }
     var hex by remember { mutableStateOf("%02X%02X%02X%02X".format(red, green, blue, (alpha * 255).toInt())) }
+    var redText by remember { mutableStateOf(red.toString()) }
+    var greenText by remember { mutableStateOf(green.toString()) }
+    var blueText by remember { mutableStateOf(blue.toString()) }
+    var alphaText by remember { mutableStateOf((alpha * 100).toInt().toString()) }
 
-    fun publish(color: Color) {
+    fun publish(color: Color, syncInputs: Boolean = true) {
         val c = color.copy(alpha = alpha.coerceIn(0f, 1f))
         red = (c.red * 255).toInt().coerceIn(0, 255)
         green = (c.green * 255).toInt().coerceIn(0, 255)
         blue = (c.blue * 255).toInt().coerceIn(0, 255)
         hex = "%02X%02X%02X%02X".format(red, green, blue, (c.alpha * 255).toInt())
+        if (syncInputs) { redText = red.toString(); greenText = green.toString(); blueText = blue.toString(); alphaText = (alpha * 100).toInt().toString() }
         onPick(Rgba(c.red.toDouble(), c.green.toDouble(), c.blue.toDouble(), c.alpha.toDouble()))
     }
     fun current() = Color.hsv(h, s.coerceIn(0f, 1f), v.coerceIn(0f, 1f), alpha.coerceIn(0f, 1f))
@@ -78,13 +85,13 @@ fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit,
         alpha = color.alpha
         publish(color)
     }
-    fun updateRgb(r: Int = red, g: Int = green, b: Int = blue, a: Int = (alpha * 255).toInt()) {
+    fun updateRgb(r: Int = red, g: Int = green, b: Int = blue, a: Int = (alpha * 255).toInt(), syncInputs: Boolean = true) {
         red = r.coerceIn(0, 255); green = g.coerceIn(0, 255); blue = b.coerceIn(0, 255)
         alpha = a.coerceIn(0, 255) / 255f
         val color = Color(red, green, blue, (alpha * 255).toInt())
         val hsv = color.toHsv()
         h = hsv[0]; s = hsv[1]; v = hsv[2]
-        publish(color)
+        publish(color, syncInputs)
     }
     val sliderColors = SliderDefaults.colors(
         thumbColor = StudioColors.Accent,
@@ -97,7 +104,7 @@ fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit,
         containerColor = StudioColors.Panel,
         title = { Text(tr("Color", "رنگ"), color = StudioColors.TextPrimary) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(12.dp)).background(current()))
                 Text(tr("Hue", "رنگ‌مایه"), color = StudioColors.TextMuted, fontSize = 12.sp)
                 Slider(h, { h = it; publish(current()) }, valueRange = 0f..360f, colors = sliderColors)
@@ -133,14 +140,21 @@ fun ColorPickerDialog(initial: Rgba, onPick: (Rgba) -> Unit, onDone: () -> Unit,
                         "R" to red, "G" to green, "B" to blue, "A" to (alpha * 100).toInt(),
                     ).forEach { (label, value) ->
                         OutlinedTextField(
-                            value = value.toString(),
+                            value = when (label) { "R" -> redText; "G" -> greenText; "B" -> blueText; else -> alphaText },
                             onValueChange = { input ->
-                                val parsed = input.filter(Char::isDigit).take(3).toIntOrNull() ?: return@OutlinedTextField
+                                val clean = input.filter(Char::isDigit).take(3)
                                 when (label) {
-                                    "R" -> updateRgb(r = parsed)
-                                    "G" -> updateRgb(g = parsed)
-                                    "B" -> updateRgb(b = parsed)
-                                    "A" -> updateRgb(a = (parsed.coerceIn(0, 100) * 255 / 100))
+                                    "R" -> redText = clean
+                                    "G" -> greenText = clean
+                                    "B" -> blueText = clean
+                                    "A" -> alphaText = clean
+                                }
+                                val parsed = clean.toIntOrNull() ?: return@OutlinedTextField
+                                when (label) {
+                                    "R" -> updateRgb(r = parsed, syncInputs = false)
+                                    "G" -> updateRgb(g = parsed, syncInputs = false)
+                                    "B" -> updateRgb(b = parsed, syncInputs = false)
+                                    "A" -> updateRgb(a = (parsed.coerceIn(0, 100) * 255 / 100), syncInputs = false)
                                 }
                             },
                             label = { Text(label) },

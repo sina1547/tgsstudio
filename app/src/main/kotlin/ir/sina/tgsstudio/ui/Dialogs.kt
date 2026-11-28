@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -100,6 +101,71 @@ fun ExportDialog(doc: LottieDocument, onExport: (ExportKind) -> Unit, onDismiss:
             }
         },
         confirmButton = { TextButton(onDismiss) { Text(tr("Close", "بستن"), color = StudioColors.Accent) } },
+    )
+}
+
+/** Changes the actual composition dimensions, not only the viewport zoom. */
+@Composable
+fun CanvasSizeDialog(
+    currentWidth: Int,
+    currentHeight: Int,
+    onApply: (Int, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var widthText by remember(currentWidth, currentHeight) { mutableStateOf(currentWidth.toString()) }
+    var heightText by remember(currentWidth, currentHeight) { mutableStateOf(currentHeight.toString()) }
+    var lockRatio by remember { mutableStateOf(false) }
+    val ratio = currentWidth.toDouble() / currentHeight.coerceAtLeast(1)
+    val width = normalizeNumber(widthText).toIntOrNull()
+    val height = normalizeNumber(heightText).toIntOrNull()
+    val valid = width != null && height != null && width in 1..8192 && height in 1..8192
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = StudioColors.Panel,
+        title = { DialogTitle(tr("Canvas size", "اندازه بوم")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    tr("Set the composition dimensions in pixels. This changes the document and its exports.", "ابعاد سند را برحسب پیکسل تنظیم کنید. این تغییر روی خود سند و خروجی‌ها اعمال می‌شود."),
+                    color = StudioColors.TextMuted,
+                    fontSize = 12.sp,
+                )
+                OutlinedTextField(
+                    value = widthText,
+                    onValueChange = { input ->
+                        widthText = normalizeNumber(input).filter { it.isDigit() }.take(4)
+                        val parsed = widthText.toIntOrNull()
+                        if (lockRatio && parsed != null && ratio.isFinite()) heightText = (parsed / ratio).toInt().coerceIn(1, 8192).toString()
+                    },
+                    label = { Text(tr("Width (px)", "عرض (پیکسل)")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = heightText,
+                    onValueChange = { input ->
+                        heightText = normalizeNumber(input).filter { it.isDigit() }.take(4)
+                        val parsed = heightText.toIntOrNull()
+                        if (lockRatio && parsed != null && ratio.isFinite()) widthText = (parsed * ratio).toInt().coerceIn(1, 8192).toString()
+                    },
+                    label = { Text(tr("Height (px)", "ارتفاع (پیکسل)")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = lockRatio, onCheckedChange = { lockRatio = it })
+                    Text(tr("Lock aspect ratio", "قفل نسبت تصویر"), color = StudioColors.TextPrimary, fontSize = 13.sp)
+                }
+                if (!valid) Text(tr("Enter dimensions from 1 to 8192 pixels.", "ابعاد باید بین ۱ تا ۸۱۹۲ پیکسل باشند."), color = StudioColors.Danger, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = { if (width != null && height != null) onApply(width, height) }) {
+                Text(tr("Apply", "اعمال"), color = StudioColors.Accent)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel", "انصراف"), color = StudioColors.TextMuted) } },
     )
 }
 

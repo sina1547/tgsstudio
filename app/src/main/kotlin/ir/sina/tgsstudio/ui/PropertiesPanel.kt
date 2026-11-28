@@ -1,11 +1,18 @@
 package ir.sina.tgsstudio.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
@@ -53,28 +60,55 @@ fun PropertiesPanel(state: EditorState) {
     val tick = state.tick
     val sel = state.session.selection
     val target = sel.firstOrNull()
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 6.dp)) {
+    var activeSection by rememberSaveable { mutableStateOf("transform") }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Ic.Props, StudioColors.Accent, 20.dp)
             Text(tr("Properties", "ویژگی‌ها"), color = StudioColors.TextPrimary, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp))
-            if (sel.size > 1) Text(tr("${sel.size} selected (editing the first)", "${sel.size} مورد انتخاب شده (ویرایش اولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
+            if (sel.size > 1) Text(tr("${sel.size} selected · first layer", "${sel.size} انتخاب · ویرایش مورد اول"), color = StudioColors.TextMuted, fontSize = 11.sp)
         }
         if (target == null) {
             if (state.tool == Tool.RECT) ShapeSection(state, null)
-            Text(tr("Select an element on the canvas or in Layers.", "یک عنصر را روی بوم یا در لایه‌ها انتخاب کنید."), color = StudioColors.TextMuted, modifier = Modifier.padding(vertical = 16.dp))
+            else Text(tr("Select an element on the canvas or in Layers.", "یک عنصر را روی بوم یا در لایه‌ها انتخاب کنید."), color = StudioColors.TextMuted, modifier = Modifier.padding(vertical = 16.dp))
             return@Column
         }
-        TransformSection(state, target)
-        if (target is LayerTarget) {
-            LayerTimingSection(state, target)
-            MaskSection(state, target)
+        val sections = listOf(
+            "transform" to tr("Transform", "تبدیل"),
+            "appearance" to tr("Appearance", "ظاهر"),
+            "shape" to tr("Shape", "شکل"),
+            "animation" to tr("Animation", "انیمیشن"),
+            "effects" to tr("Effects", "افکت‌ها"),
+            "path" to tr("Path / Mask", "مسیر / ماسک"),
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            sections.forEach { (key, label) ->
+                SmallButton(label, { activeSection = key }, primary = activeSection == key)
+            }
         }
-        AppearanceSection(state, target)
-        ShapeSection(state, target)
-        TrimSection(state, target)
-        PathSection(state, target)
-        AnimationSection(state, target)
-        EffectsSection(state, target)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(StudioColors.Divider))
+        Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            when (activeSection) {
+                "transform" -> {
+                    TransformSection(state, target)
+                    if (target is LayerTarget) LayerTimingSection(state, target)
+                }
+                "appearance" -> AppearanceSection(state, target)
+                "shape" -> {
+                    ShapeSection(state, target)
+                    TrimSection(state, target)
+                }
+                "animation" -> AnimationSection(state, target)
+                "effects" -> EffectsSection(state, target)
+                "path" -> {
+                    PathSection(state, target)
+                    if (target is LayerTarget) MaskSection(state, target)
+                }
+                else -> TransformSection(state, target)
+            }
+        }
     }
 }
 
@@ -161,10 +195,7 @@ private fun TransformSection(state: EditorState, t: Target) {
             NumberField(v.scaleY, { state.act { setScale(t, if (linked) it else v.scaleX, it) } }, Modifier.weight(1f), label = "Sy", suffix = "%")
         }
         Labeled(tr("Rotation", "چرخش")) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumberField(v.rotation, { state.act { setRotation(t, it) } }, Modifier.weight(0.45f), suffix = "°")
-                GestureSlider(v.rotation.toFloat().coerceIn(-360f, 360f), -360f..360f, { state.session.beginGesture("Rotation") }, { a -> state.session.setRotation(t, a.toDouble()); state.changed() }, { state.session.endGesture(); state.changed() }, Modifier.weight(0.55f))
-            }
+            StepperField(v.rotation, { state.act { setRotation(t, it) } }, Modifier.fillMaxWidth(), decimals = 1, suffix = "°", step = 1.0, min = -360.0, max = 360.0)
         }
         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NumberField(v.anchorX, { state.act { setAnchor(t, it, v.anchorY) } }, Modifier.weight(1f), label = "Ax")
@@ -181,10 +212,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
     val gradient = state.session.gradientOf(t)
     Section(tr("Appearance", "ظاهر")) {
         Labeled(tr("Opacity", "شفافیت")) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GestureSlider(v.opacity.toFloat().coerceIn(0f, 100f), 0f..100f, { state.session.beginGesture("Opacity") }, { a -> state.session.setOpacity(t, a.toDouble()); state.changed() }, { state.session.endGesture(); state.changed() }, Modifier.weight(1f))
-                NumberField(v.opacity, { state.act { setOpacity(t, it) } }, Modifier.weight(0.4f), decimals = 0, suffix = "%")
-            }
+            StepperField(v.opacity, { state.act { setOpacity(t, it) } }, Modifier.fillMaxWidth(), decimals = 0, suffix = "%", step = 1.0, min = 0.0, max = 100.0)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(tr("Fill", "پرکننده"), color = StudioColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
@@ -216,6 +244,13 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             }
         }
         if (gradient != null) {
+            val orderedStops = gradient.stops.sortedBy { it.position }
+            if (orderedStops.size >= 2) {
+                Box(
+                    Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(8.dp))
+                        .background(Brush.horizontalGradient(*orderedStops.map { it.position.toFloat() to it.color.toColor() }.toTypedArray())),
+                )
+            }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SmallButton(tr("Linear", "خطی"), { state.act { setGradient(t, gradient.copy(radial = false)) } }, primary = !gradient.radial)
                 SmallButton(tr("Radial", "شعاعی"), { state.act { setGradient(t, gradient.copy(radial = true)) } }, primary = gradient.radial)
@@ -235,19 +270,18 @@ private fun AppearanceSection(state: EditorState, t: Target) {
                     }, size = 32.dp, iconSize = 16.dp)
                 }
             }
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(gradient.startX, { state.act { setGradient(t, gradient.copy(startX = it)) } }, Modifier.weight(1f), label = "X1")
                 NumberField(gradient.startY, { state.act { setGradient(t, gradient.copy(startY = it)) } }, Modifier.weight(1f), label = "Y1")
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NumberField(gradient.endX, { state.act { setGradient(t, gradient.copy(endX = it)) } }, Modifier.weight(1f), label = "X2")
                 NumberField(gradient.endY, { state.act { setGradient(t, gradient.copy(endY = it)) } }, Modifier.weight(1f), label = "Y2")
             }
         }
         state.session.strokeWidth(t)?.let { w ->
             Labeled(tr("Stroke width", "ضخامت خط")) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GestureSlider(w.toFloat().coerceIn(0f, 60f), 0f..60f, { state.session.beginGesture("Stroke width") }, { a -> state.session.setStrokeWidth(t, a.toDouble()); state.changed() }, { state.session.endGesture(); state.changed() }, Modifier.weight(1f))
-                    NumberField(w, { state.act { setStrokeWidth(t, it) } }, Modifier.weight(0.4f))
-                }
+                StepperField(w, { state.act { setStrokeWidth(t, it) } }, Modifier.fillMaxWidth(), decimals = 1, step = 0.5, min = 0.0, max = 60.0)
             }
         }
     }
@@ -309,24 +343,22 @@ private fun ShapeSection(state: EditorState, t: Target?) {
     } ?: emptyList()
     if (entries.isEmpty() && state.tool != Tool.RECT) return
     val rectangleRadius = entries.firstOrNull {
-        it.key == "r" && it.owner.contains("rect", ignoreCase = true)
+        it.key == "roundness" || (it.key == "r" && it.owner.contains("rect", ignoreCase = true))
     }
     Section(tr("Shape", "شکل")) {
         // Creation default: available before drawing a rectangle.
         if (state.tool == Tool.RECT) {
             Text(tr("Corner radius (0 = square)", "گردی گوشه‌ها (صفر = مستطیل معمولی)"), color = StudioColors.TextMuted, fontSize = 12.sp)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumberField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.width(76.dp), decimals = 0, suffix = "px")
-                GestureSlider(state.rectRoundness, 0f..120f, {}, { state.rectRoundness = it.coerceIn(0f, 120f) }, {}, Modifier.weight(1f))
-            }
+            StepperField(state.rectRoundness.toDouble(), { state.rectRoundness = it.toFloat().coerceIn(0f, 120f) }, Modifier.fillMaxWidth(), decimals = 0, suffix = "px", step = 1.0, min = 0.0, max = 120.0)
         }
 
         // Selected rectangle: edit the actual Rectangle Path roundness property after creation.
         if (t != null && rectangleRadius != null) {
             val radius = (state.session.valueAt(rectangleRadius)?.firstOrNull() ?: 0.0).coerceIn(0.0, 120.0)
             Labeled(tr("Corner radius", "گردی گوشه‌ها")) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(radius, { value ->
+                StepperField(
+                    radius,
+                    { value ->
                         val next = value.coerceIn(0.0, 120.0)
                         state.act {
                             edit("Rectangle corner radius") {
@@ -337,22 +369,14 @@ private fun ShapeSection(state: EditorState, t: Target?) {
                                 )
                             }
                         }
-                    }, Modifier.width(76.dp), decimals = 0, suffix = "px")
-                    GestureSlider(
-                        radius.toFloat(), 0f..120f,
-                        { state.session.beginGesture("Rectangle corner radius") },
-                        { value ->
-                            PropWrite.setValues(
-                                rectangleRadius.prop,
-                                Spaces.localFrame(state.session.index, t.layer.scope, state.frame),
-                                doubleArrayOf(value.coerceIn(0f, 120f).toDouble()),
-                            )
-                            state.changed()
-                        },
-                        { state.session.endGesture(); state.changed() },
-                        Modifier.weight(1f),
-                    )
-                }
+                    },
+                    Modifier.fillMaxWidth(),
+                    decimals = 0,
+                    suffix = "px",
+                    step = 1.0,
+                    min = 0.0,
+                    max = 120.0,
+                )
             }
         }
 
@@ -418,7 +442,7 @@ private fun PathSection(state: EditorState, t: Target) {
 
 @Composable
 private fun AnimationSection(state: EditorState, t: Target) {
-    val entries = state.session.animatedProps(t).filter { it.depth == 0 }
+    val entries = state.session.animatedProps(t).filter { it.depth <= 3 }
     if (entries.isEmpty()) return
     Section(tr("Animation", "انیمیشن"), defaultOpen = false) {
         for (e in entries) {
@@ -454,7 +478,7 @@ private fun TrimSection(state: EditorState, t: Target) {
             val v = session.valueAt(e)?.firstOrNull() ?: 0.0
             val here = KeyframeOps.times(e.prop).indexOfFirst { kotlin.math.abs(it - lf) < 0.5 }
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(propLabel(e.key), color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.weight(0.9f))
+                Text(when (e.key) { "start" -> tr("Trim start %", "شروع برش ٪"); "end" -> tr("Trim end %", "پایان برش ٪"); else -> tr("Trim offset °", "جابه‌جایی برش °") }, color = StudioColors.TextMuted, fontSize = 12.sp, modifier = Modifier.weight(0.9f))
                 NumberField(v, { nv -> state.act { edit("Trim") { PropWrite.setValues(e.prop, lf, doubleArrayOf(nv)) } } }, Modifier.weight(1f), suffix = if (e.key == "offset") "°" else "%")
                 IconBtn(Ic.Key, { state.act { if (here >= 0) removeKeyframe(e, here) else addKeyframe(e, t.layer.scope) } }, size = 38.dp, iconSize = 18.dp, active = here >= 0)
             }

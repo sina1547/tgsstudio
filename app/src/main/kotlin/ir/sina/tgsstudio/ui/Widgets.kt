@@ -116,6 +116,34 @@ fun NumberField(value: Double, onCommit: (Double) -> Unit, modifier: Modifier = 
 }
 
 /** Slider that reports one undo step per drag: [onStart] when it begins, [onChange] while moving, [onEnd] on release. */
+/** Compact numeric control used in the Properties inspector instead of drag sliders. */
+@Composable
+fun StepperField(
+    value: Double,
+    onCommit: (Double) -> Unit,
+    modifier: Modifier = Modifier,
+    decimals: Int = 1,
+    label: String? = null,
+    suffix: String = "",
+    step: Double = 1.0,
+    min: Double = Double.NEGATIVE_INFINITY,
+    max: Double = Double.POSITIVE_INFINITY,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(StudioColors.PanelHigh)
+                .clickable { onCommit((value - step).coerceIn(min, max)) },
+            contentAlignment = Alignment.Center,
+        ) { Text("−", color = StudioColors.TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.Medium) }
+        NumberField(value, { onCommit(it.coerceIn(min, max)) }, Modifier.weight(1f), decimals, label, suffix)
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(StudioColors.PanelHigh)
+                .clickable { onCommit((value + step).coerceIn(min, max)) },
+            contentAlignment = Alignment.Center,
+        ) { Text("+", color = StudioColors.TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.Medium) }
+    }
+}
+
 @Composable
 fun GestureSlider(value: Float, range: ClosedFloatingPointRange<Float>, onStart: () -> Unit, onChange: (Float) -> Unit, onEnd: () -> Unit, modifier: Modifier = Modifier) {
     var dragging by remember { mutableStateOf(false) }

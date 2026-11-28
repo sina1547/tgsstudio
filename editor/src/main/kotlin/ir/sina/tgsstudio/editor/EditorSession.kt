@@ -168,6 +168,12 @@ class EditorSession(val doc: LottieDocument) {
     fun setAnchor(t: Target, x: Double, y: Double) = edit("Anchor") { TransformOps.setAnchor(index, t, lf(t), x, y) }
     fun setOpacity(t: Target, percent: Double) = edit("Opacity") { TransformOps.setOpacity(index, t, lf(t), percent) }
 
+    /** Resize the composition itself; the new dimensions are stored in the Lottie document and undoable. */
+    fun setCanvasSize(width: Int, height: Int) = edit("Canvas size") {
+        doc.root.putInt("w", width.coerceIn(1, 8192))
+        doc.root.putInt("h", height.coerceIn(1, 8192))
+    }
+
     fun fillColor(t: Target) = StyleOps.fillColor(index, t, lf(t))
     fun strokeColor(t: Target) = StyleOps.strokeColor(index, t, lf(t))
     fun strokeWidth(t: Target) = StyleOps.strokeWidth(index, t, lf(t))
