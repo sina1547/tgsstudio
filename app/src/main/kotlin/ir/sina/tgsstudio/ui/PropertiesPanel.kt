@@ -248,7 +248,7 @@ private fun AppearanceSection(state: EditorState, t: Target) {
             if (orderedStops.size >= 2) {
                 Box(
                     Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(8.dp))
-                        .background(Brush.horizontalGradient(colorStops = orderedStops.map { it.position.toFloat() to it.color.toColor() }.toTypedArray())),
+                        .background(Brush.horizontalGradient(*orderedStops.map { it.position.toFloat() to it.color.toColor() }.toTypedArray())),
                 )
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
