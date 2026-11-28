@@ -52,7 +52,8 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -238,8 +239,20 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
             }
             Box(
                 Modifier.weight(1f).horizontalScroll(scroll).pointerInput(state) {
-                    detectTransformGestures { _, _, zoom, _ ->
-                        state.timelinePxPerFrame = (state.timelinePxPerFrame * zoom).coerceIn(1.5f, 40f)
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val pressed = event.changes.count { it.pressed }
+                            if (pressed >= 2) {
+                                val zoom = event.calculateZoom()
+                                if (zoom.isFinite() && zoom != 1f) {
+                                    state.timelinePxPerFrame = (state.timelinePxPerFrame * zoom).coerceIn(1.5f, 40f)
+                                }
+                                event.changes.forEach { it.consume() }
+                            }
+                            if (pressed == 0) break
+                        }
                     }
                 }
             ) {
@@ -253,6 +266,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                     state.seek(Math.rint(doc.inPoint + down.position.x / ppf))
                                     while (true) {
                                         val event = awaitPointerEvent()
+                                        if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                         val change = event.changes.first()
                                         if (change.changedToUp()) { change.consume(); break }
                                         state.seek(Math.rint(doc.inPoint + change.position.x / ppf))
@@ -274,6 +288,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                             var changed = false
                                             while (true) {
                                                 val event = awaitPointerEvent()
+                                                if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                                 val change = event.changes.first()
                                                 if (change.changedToUp()) { change.consume(); break }
                                                 val deltaFrames = (change.position.x - down.position.x) / ppf
@@ -299,6 +314,7 @@ private fun LayerTracks(state: EditorState, widthDp: androidx.compose.ui.unit.Dp
                                                 var changedClip = false
                                                 while (true) {
                                                     val event = awaitPointerEvent()
+                                                    if (event.changes.count { it.pressed } >= 2) { event.changes.forEach { it.consume() }; break }
                                                     val change = event.changes.first()
                                                     if (change.changedToUp()) { change.consume(); break }
                                                     val rawDelta = Math.rint(((change.position.x - down.position.x) / ppf).toDouble())
